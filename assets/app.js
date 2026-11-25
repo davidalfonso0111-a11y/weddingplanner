@@ -1,0 +1,33 @@
+/* Public sales prototype: no authentication or server-side authorization. */
+let screen='public',pubRoute='home',route='dashboard',ROLE='owner',selectedWedding=null,weddingTab='overzicht',portalTab='overzicht',portalWedding='w1';
+const ROLES={owner:'Owner',planner:'Wedding Planner',styling:'Styling & Decoratie',finance:'Finance'};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function locale(){return {nl:'nl-BE',en:'en-GB',fr:'fr-BE',de:'de-DE'}[typeof LANG==='undefined'?'nl':LANG];}
+function eur(n){return new Intl.NumberFormat(locale(),{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(Number(n)||0);}
+function fdate(d){return d?new Date(d+'T12:00:00').toLocaleDateString(locale(),{day:'numeric',month:'short',year:'numeric'}):'—';}
+function daysUntil(d){return Math.max(0,Math.ceil((new Date(d+'T12:00:00')-new Date())/86400000));}
+function can(area){return ROLE==='owner'||!!DB.perms[ROLE]?.[area];}
+function visibleWeddings(){return DB.weddings.filter(w=>ROLE==='owner'||ROLE==='finance'||w.planner==='Anja');}
+function visibleTasks(){const ids=new Set(visibleWeddings().map(w=>w.id));return DB.tasks.filter(t=>ids.has(t.wedding)&&(ROLE==='owner'||t.dept===({planner:'Planning',styling:'Styling',finance:'Finance'}[ROLE])));}
+function toast(text){const e=$('toast');e.textContent=typeof translateText==='function'?translateText(text):text;e.classList.add('show');clearTimeout(e._timer);e._timer=setTimeout(()=>e.classList.remove('show'),3000);}
+function openModal(html){$('modalBody').innerHTML=html;$('modal').classList.add('show');if(typeof applyLanguage==='function')applyLanguage();}
+function closeModal(){$('modal').classList.remove('show');}
+function audit(what,w='—'){DB.log.unshift({t:new Date().toLocaleString(locale()),who:ROLES[ROLE],what,w});}
+const STATUS={new:'Nieuw',contacted:'Gecontacteerd',consultation:'Kennismaking',converted:'Geconverteerd',lost:'Verloren',planning:'In planning',in_progress:'Bezig',completed:'Afgerond',todo:'Te doen',waiting:'Wachten',under_review:'Ter controle',paid:'Betaald',unpaid:'Openstaand',approved:'Goedgekeurd',pending:'In afwachting',changes_requested:'Wijziging gevraagd',high:'Hoog',medium:'Normaal',low:'Laag',urgent:'Urgent'};
+function statusBadge(s){return `<span class="badge ${['completed','paid','approved'].includes(s)?'olive':['unpaid','urgent','high'].includes(s)?'terra':'gold'}">${esc(STATUS[s]||s)}</span>`;}
+function header(title,sub='',actions=''){return `<div class="topbar"><div><div class="eyebrow">${esc(sub)}</div><h1>${esc(title)}</h1></div><div class="row">${actions}</div></div>`;}
+function setRoute(r){route=r;selectedWedding=null;render();}
+function setRole(r){if(!ROLES[r])return;ROLE=r;route='dashboard';selectedWedding=null;render();}
+function openWedding(id){if(!visibleWeddings().some(w=>w.id===id))return;selectedWedding=id;route='weddings';weddingTab='overzicht';render();}
+function setWTab(t){weddingTab=t;render();}
+function render(){let html=screen==='admin'?renderAdmin():screen==='portal'?renderPortal():renderPublic();$('app').innerHTML=html;if(typeof applyLanguage==='function')applyLanguage();}
+function saveTask(id,s){const t=visibleTasks().find(x=>x.id===id);if(!t||!can('tasks')||!['todo','in_progress','waiting','under_review','completed'].includes(s))return;t.status=s;audit('Taak bijgewerkt: '+t.title);save();render();toast('Opgeslagen');}
+function setLeadStatus(id,s){if(!can('leads'))return;const l=DB.leads.find(x=>x.id===id);if(!l)return;l.status=s;save();render();}
+function convertLead(id){if(!can('leads'))return;const l=DB.leads.find(x=>x.id===id);if(!l||l.status==='converted')return;const cid='c'+Date.now(),wid='w'+Date.now();DB.clients.push({id:cid,name:l.name,email:l.email});DB.weddings.push({id:wid,couple:l.name,date:l.wedding_date||'',venue:'Nog te bepalen',guests:l.guest_count||0,package:'Signature',status:'planning',budget:0,spent:0,planner:'Anja',client_id:cid});l.status='converted';audit('Lead omgezet naar wedding',l.name);save();openWedding(wid);toast('Wedding aangemaakt');}
+function openTask(){if(!can('tasks'))return;openModal(`<h2>Nieuwe taak</h2><form onsubmit="addTask(event)"><div class="field"><label>Naam</label><input name="title" required maxlength="150"></div><div class="field"><label>Wedding</label><select name="wedding">${visibleWeddings().map(w=>`<option value="${esc(w.id)}">${esc(w.couple)}</option>`).join('')}</select></div><div class="field"><label>Afdeling</label><select name="dept">${(ROLE==='owner'?['Planning','Styling','Finance']:[{planner:'Planning',styling:'Styling'}[ROLE]]).map(d=>`<option>${d}</option>`).join('')}</select></div><div class="field"><label>Deadline</label><input type="date" name="deadline" required></div><div class="row"><button class="btn" type="submit">Opslaan</button><button type="button" class="btn ghost" onclick="closeModal()">Annuleer</button></div></form>`);}
+function addTask(e){e.preventDefault();if(!can('tasks'))return;const f=new FormData(e.target),w=String(f.get('wedding')),dept=String(f.get('dept'));if(!visibleWeddings().some(x=>x.id===w)||(ROLE!=='owner'&&dept!==({planner:'Planning',styling:'Styling'}[ROLE])))return;DB.tasks.push({id:'t'+Date.now(),wedding:w,title:String(f.get('title')).trim(),dept,assignee:{Planning:'Anja',Styling:'Lena',Finance:'Joris'}[dept],status:'todo',priority:'medium',deadline:f.get('deadline'),client:false});audit('Nieuwe taak aangemaakt');save();closeModal();render();}
+function toggleInvoice(id){if(!can('finance'))return;const i=DB.invoices.find(x=>x.id===id);if(!i)return;i.status=i.status==='paid'?'unpaid':'paid';audit('Factuurstatus gewijzigd: '+i.number);save();render();}
+function downloadDemo(title){const w=DB.weddings.find(x=>x.id===portalWedding);const blob=new Blob(['Belles Creator — DEMONSTRATIEDOCUMENT\n\n'+title+'\n'+w.couple+'\n'+fdate(w.date)+'\n'+w.venue+'\n\nGeen contract, factuur of definitieve planning.'],{type:'text/plain;charset=utf-8'});const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download='belles-creator-demo.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function exportDemo(){const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}),a=document.createElement('a'),url=URL.createObjectURL(b);a.href=url;a.download='belles-creator-demodata.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+document.addEventListener('DOMContentLoaded',()=>{$('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});render();});
