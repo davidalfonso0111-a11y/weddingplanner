@@ -334,7 +334,6 @@ P.team=function(){
   const roles=Object.keys(DB.access);
   return top('Team & toegang',`<button type="button" class="bc-btn" onclick="BC.memberModal()">${ic('plus',16)}Teamlid</button>`)+
   `<div class="bc-grid wide">${card('Accounts',`<div class="bc-list">${DB.accounts.map(a=>`<div class="bc-row"><span class="bc-avatar" data-no-translate>${esc(initials(a.name))}</span><div class="grow"><span class="t" data-no-translate>${esc(a.name)}</span><span class="s">${esc(ROLE_INFO[a.role]?.label||a.role)}</span></div>${a.role==='owner'?'<span class="bc-pill gold">Owner</span>':`<button type="button" class="bc-btn ghost sm" onclick="BC.pinModal('${safeId(a.id)}')">PIN</button>${sw(a.active,`BC.toggleAccount('${safeId(a.id)}')`,'Actief')}`}</div>`).join('')}</div><p class="small muted">Demo-accounts in deze browser. Echte logins vragen een beveiligde server.</p>`)}
-${card('Intro bij inloggen',`<p class="small muted">Deze animatie speelt na het inloggen. Tik op een stijl om ze te bekijken en te kiezen.</p>${seg(INTROS,introChoice(),'BC.setIntro')}<div><button type="button" class="bc-btn ghost sm" onclick="BC.playIntro()">Opnieuw afspelen</button></div>`,'','rich')}
 ${card('Wat ziet elke afdeling?',`<div class="bc-list">${roles.map(r=>`<div style="padding:12px 0;border-top:1px solid rgba(230,196,143,.12)"><p class="t" style="margin-bottom:6px">${esc(ROLE_INFO[r].label)}</p>${ACCESS_AREAS.map(([k,l])=>`<div class="bc-row" style="min-height:48px;border:0;padding:4px 0"><div class="grow"><span class="s">${esc(l)}</span></div>${sw(!!DB.access[r][k],`BC.setAccess('${r}','${k}',this.checked)`,ROLE_INFO[r].label+' '+l)}</div>`).join('')}</div>`).join('')}</div>`)}</div>`;
 };
 P.activity=function(){return top('Activiteit')+card('Logboek',`<div class="bc-list">${DB.log.slice(0,80).map(l=>`<div class="bc-row"><div class="grow"><span class="t">${esc(l.what)}</span><span class="s"><span data-no-translate>${esc(l.who)}</span> · ${esc(l.w)} · ${esc(new Date(l.t).toLocaleString('nl-BE',{dateStyle:'medium',timeStyle:'short'}))}</span></div></div>`).join('')||empty('Nog geen activiteit.')}</div>`);};
@@ -391,25 +390,18 @@ function formData(e){e.preventDefault();return new FormData(e.target);}
 const val=(f,k)=>String(f.get(k)||'').trim();
 const isDate=v=>/^\d{4}-\d{2}-\d{2}$/.test(v),isTime=v=>/^\d{2}:\d{2}$/.test(v);
 
-/* ---------- intro animations ---------- */
-const INTRO_KEY='bc_atelier_intro';
-const INTROS=[['1','Gouden glans'],['2','Velours gordijn'],['3','Gouden ring']];
-function introChoice(){let v='1';try{v=localStorage.getItem(INTRO_KEY)||'1';}catch(e){}return INTROS.some(x=>x[0]===v)?v:'1';}
-function playIntro(v,name){
-  v=INTROS.some(x=>x[0]===String(v))?String(v):'1';
+/* ---------- intro animation "Gouden glans" (BC logo + slogan) ----------
+   Plays ONLY right after a successful login, never before the login screen.
+   Any future login method (e-mail + wachtwoord, PIN) must call playIntro() on success too. */
+function playIntro(name){
   const old=document.getElementById('bc-intro');if(old)old.remove();
-  const slogan='Created once. Remembered forever.';
-  const words=slogan.split(' ').map((w,i)=>`<span style="animation-delay:${(v==='3'?1.6:1.5)+i*.14}s">${esc(w)}&nbsp;</span>`).join('');
-  const hello=name?(v==='2'?'Welkom, '+name:'Welkom, '+name):'';
-  const sparks=v==='3'?[...Array(14)].map((_,i)=>{const a=i/14*Math.PI*2,r=140+(i%3)*40;return `<i class="spark" style="--x:${Math.round(Math.cos(a)*r)}px;--y:${Math.round(Math.sin(a)*r)}px;animation-delay:${(.9+(i%5)*.12).toFixed(2)}s"></i>`;}).join(''):'';
-  const el=document.createElement('div');el.id='bc-intro';el.className='v'+v;el.setAttribute('role','presentation');
-  el.innerHTML=(v==='2'?'<div class="curtain l"></div><div class="curtain r"></div>':'')+(v==='3'?'<div class="ring"></div><div class="ring b"></div>'+sparks:'')+
-    `<div class="logo"><img src="./assets/img/monogram-mark.png" alt="">${v==='1'?'<div class="shine"></div>':''}</div>`+
-    `<div class="slogan" data-no-translate>${v==='2'?esc(slogan):words}</div>`+(hello?`<div class="hello" data-no-translate>${esc(hello)}</div>`:'')+`<div class="skip">Tik om verder te gaan</div>`;
-  const total=v==='2'?4.2:3.9;el.style.setProperty('--out',total+'s');
+  const words='Created once. Remembered forever.'.split(' ').map((w,i)=>`<span style="animation-delay:${1.5+i*.14}s">${esc(w)}&nbsp;</span>`).join('');
+  const el=document.createElement('div');el.id='bc-intro';el.className='v1';el.setAttribute('role','presentation');
+  el.innerHTML=`<div class="logo"><img src="./assets/img/monogram-mark.png" alt=""><div class="shine"></div></div><div class="slogan" data-no-translate>${words}</div>`+(name?`<div class="hello" data-no-translate>${esc('Welkom, '+name)}</div>`:'')+`<div class="skip">Tik om verder te gaan</div>`;
+  el.style.setProperty('--out','3.9s');
   const close=()=>{if(el.isConnected)el.remove();};
   el.addEventListener('click',close);el.addEventListener('animationend',e=>{if(e.target===el)close();});
-  setTimeout(close,(total+1)*1000);
+  setTimeout(close,4900);
   document.body.appendChild(el);
 }
 
@@ -421,8 +413,6 @@ window.BC={
   addDeadline(e){const f=formData(e),m=me(),title=val(f,'title'),w=val(f,'wedding'),dept=val(f,'dept'),prio=val(f,'priority'),dl=val(f,'deadline');const okDept=m.role==='owner'?DEPTS.includes(dept):dept===ROLE_INFO[m.role].dept;
     if(!title||!wed(w)||!okDept||!PRIO[prio]||!isDate(dl)){toast('Controleer de invoer');return;}
     DB.tasks.push({id:uid('t'),wedding:w,title,dept,assignee:assigneeFor(dept),priority:prio,status:'todo',deadline:dl,client:false});st.calDay=dl;st.calMonth=dl.slice(0,7);commit('Deadline: '+title,w);toast('In de kalender gezet');},
-  setIntro(v){if(!INTROS.some(x=>x[0]===v))return;try{localStorage.setItem(INTRO_KEY,v);}catch(e){}render();playIntro(v,'Belle');},
-  playIntro(v){playIntro(v||introChoice(),firstName());},
   go(p){st.page=p;st.sheet=false;if(p!=='wedding')st.detail=null;render();window.scrollTo(0,0);},
   sheet(o){st.sheet=!!o;render();},
   openWedding(id){if(!wed(id))return;st.detail=id;st.tab='overzicht';BC.go('wedding');},
@@ -437,7 +427,7 @@ window.BC={
   /* login */
   pickAccount(id){st.login=id&&DB.accounts.some(a=>a.id===id)?id:null;st.pin='';st.pinErr=false;render();},
   key(k){if(k==='del'){st.pin=st.pin.slice(0,-1);st.pinErr=false;render();return;}if(st.pin.length>=4)return;st.pin+=k;st.pinErr=false;
-    if(st.pin.length===4){const a=DB.accounts.find(x=>x.id===st.login);if(a&&a.active&&a.pin===st.pin){try{localStorage.setItem(SESSION_KEY,a.id);}catch(e){}st.login=null;st.pin='';st.page=ROLE_INFO[a.role].home;st.day=todayIso();log('Aangemeld');save();playIntro(introChoice(),a.role==='owner'?'Belle':a.name.split(' ')[0]);}else{st.pin='';st.pinErr=true;}}
+    if(st.pin.length===4){const a=DB.accounts.find(x=>x.id===st.login);if(a&&a.active&&a.pin===st.pin){try{localStorage.setItem(SESSION_KEY,a.id);}catch(e){}st.login=null;st.pin='';st.page=ROLE_INFO[a.role].home;st.day=todayIso();log('Aangemeld');save();playIntro(a.role==='owner'?'Belle':a.name.split(' ')[0]);}else{st.pin='';st.pinErr=true;}}
     render();},
   logout(){try{localStorage.removeItem(SESSION_KEY);}catch(e){}st.page=null;st.sheet=false;st.login=null;render();window.scrollTo(0,0);},
   /* tasks */
@@ -507,7 +497,6 @@ window.BC={
    The atelier only exists on the separate staff page (atelier.html, sets window.BC_STAFF).
    The public site and client portal can never switch to it, and the staff page never leaves it. */
 window.renderAdmin=renderAtelier;
-try{const q=new URLSearchParams(location.search).get('intro');if(window.BC_STAFF&&q)document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>playIntro(q,''),50));}catch(e){}
 if(window.BC_STAFF)screen='admin';
 const baseGoRoute=window.goRoute;
 window.goRoute=function(r){if(window.BC_STAFF||r==='admin')return;baseGoRoute(r);};
