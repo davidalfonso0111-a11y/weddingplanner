@@ -22,7 +22,8 @@ jobs:
       - name: Check complete JavaScript files
         run: |
           test -s index.html
-          for file in assets/data.js assets/app.js assets/public.js assets/admin.js assets/portal.js assets/i18n.js; do
+          test -s atelier.html
+          for file in assets/data.js assets/app.js assets/public.js assets/admin.js assets/portal.js assets/i18n.js assets/config.js assets/cloud.js assets/atelier.js; do
             test -s "$file"
             node --check "$file"
           done
@@ -34,7 +35,10 @@ jobs:
         run: |
           mkdir -p _site/assets
           cp index.html _site/index.html
+          cp atelier.html _site/atelier.html
           cp assets/*.css assets/*.js _site/assets/
+          mkdir -p _site/assets/img
+          cp assets/img/* _site/assets/img/
           touch _site/.nojekyll
       - name: Upload site
         uses: actions/upload-pages-artifact@v3

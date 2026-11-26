@@ -52,7 +52,7 @@ function applyLanguage(){
   let box=document.getElementById('languageSwitcher');
   if(!box){
     box=document.createElement('div');box.id='languageSwitcher';box.className='lang-switch';
-    box.style.cssText='position:fixed;right:16px;bottom:84px;z-index:55;background:#fff;border:1px solid #C9B28A;border-radius:999px;padding:7px 12px;box-shadow:0 4px 16px rgba(46,42,38,.1)';
+    box.style.cssText='position:fixed;right:16px;bottom:96px;z-index:55;background:#25090b;color:#f6e8da;border:1px solid rgba(230,196,143,.34);border-radius:999px;padding:7px 12px;box-shadow:0 8px 24px rgba(0,0,0,.4)';
     const label=document.createElement('label');label.htmlFor='languageSelect';label.textContent='🌐';label.style.cssText='display:inline;margin-right:6px';
     const select=document.createElement('select');select.id='languageSelect';select.style.cssText='width:auto;border:0;background:transparent;padding:2px';
     for(const [code,name]of Object.entries(LANGUAGE_NAMES)){const option=document.createElement('option');option.value=code;option.textContent=name;select.appendChild(option);}
