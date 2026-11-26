@@ -9,11 +9,14 @@ const SESSION_KEY='bc_atelier_session';
 const CLOUD=window.BCCloud&&window.BCCloud.enabled?window.BCCloud:null;
 const ROLE_INFO={
   owner:{label:'Owner',dept:null,home:'o_home',blurb:'Alles in één oogopslag'},
+  admin:{label:'Admin',dept:null,home:'o_home',blurb:'Alles in één oogopslag'},
   planner:{label:'Wedding planner',dept:'Planning',home:'p_home',blurb:'Draaiboek, taken & leveranciers'},
   stylist:{label:'Styliste',dept:'Styling',home:'s_home',blurb:'Afspraken & moodboards'},
   decoration:{label:'Decoratie',dept:'Decoratie',home:'d_home',blurb:'Opbouw & inventaris'},
   catering:{label:'Catering',dept:'Catering',home:'c_home',blurb:"Menu's, dieetwensen & proeverijen"}
 };
+/* Owner and admin both have full access; only the owner is greeted as Belle. */
+const isFull=r=>r==='owner'||r==='admin';
 const DEPTS=['Planning','Styling','Decoratie','Catering'];
 const DEPT_ROLE={Planning:'planner',Styling:'stylist',Decoratie:'decoration',Catering:'catering'};
 const DEPT_HOME={Planning:'p_home',Styling:'s_home',Decoratie:'d_home',Catering:'c_home'};
@@ -64,8 +67,8 @@ const todayIso=()=>iso(new Date());
 const safeId=v=>String(v??'').replace(/[^A-Za-z0-9_-]/g,'');
 const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 function me(){if(CLOUD){const p=CLOUD.profile;if(!p||cs.phase!=='ready'||!CLOUD.isUnlocked())return null;return DB.accounts.find(a=>a.id===p.id)||{id:p.id,name:p.name,role:p.role,active:true,email:p.email};}let id=null;try{id=localStorage.getItem(SESSION_KEY);}catch(e){}return DB.accounts.find(a=>a.id===id&&a.active)||null;}
-function isOwner(){const m=me();return !!m&&m.role==='owner';}
-function has(area){const m=me();if(!m)return false;if(m.role==='owner')return true;return !!(DB.access[m.role]||{})[area];}
+function isOwner(){const m=me();return !!m&&isFull(m.role);}
+function has(area){const m=me();if(!m)return false;if(isFull(m.role))return true;return !!(DB.access[m.role]||{})[area];}
 function wed(id){return DB.weddings.find(w=>w.id===id);}
 function wName(id){return wed(id)?.couple||'—';}
 function upcoming(){return [...DB.weddings].filter(w=>w.date).sort((a,b)=>a.date.localeCompare(b.date));}
@@ -124,7 +127,7 @@ function taskRow(t,showWedding=true){const done=t.status==='completed';return `<
 function navFor(){
   const m=me();if(!m)return [];
   const r=m.role,N=[];
-  if(r==='owner'){N.push(['o_home','Overzicht','home'],['weddings','Weddings','heart'],['tasks','Taken','check'],['grp','Afdelingen'],['p_home','Planning','clip'],['s_home','Styling','sparkle'],['d_home','Decoratie','flower'],['c_home','Catering','dish'],['grp','Beheer'],['leads','Leads & klanten','user'],['finance','Financiën','euro'],['calendar','Kalender','cal'],['vendors','Leveranciers','truck'],['docs','Documenten','folder'],['team','Team & toegang','key'],['activity','Activiteit','clock']);return N;}
+  if(isFull(r)){N.push(['o_home','Overzicht','home'],['weddings','Weddings','heart'],['tasks','Taken','check'],['grp','Afdelingen'],['p_home','Planning','clip'],['s_home','Styling','sparkle'],['d_home','Decoratie','flower'],['c_home','Catering','dish'],['grp','Beheer'],['leads','Leads & klanten','user'],['finance','Financiën','euro'],['calendar','Kalender','cal'],['vendors','Leveranciers','truck'],['docs','Documenten','folder'],['team','Team & toegang','key'],['activity','Activiteit','clock']);return N;}
   if(r==='planner')N.push(['p_home','Vandaag','home']);
   if(r==='stylist')N.push(['s_home','Mijn planning','cal'],['s_props','Moodboards','palette']);
   if(r==='decoration')N.push(['d_home','Opbouw','flower'],['d_inv','Inventaris','box']);
@@ -137,7 +140,7 @@ function navFor(){
   if(has('vendors'))N.push(['vendors','Leveranciers','truck']);
   return N;
 }
-function allowed(page){const m=me();if(!m)return false;if(m.role==='owner')return true;if(page==='wedding')return has('weddings');return navFor().some(n=>n[0]===page);}
+function allowed(page){const m=me();if(!m)return false;if(isFull(m.role))return true;if(page==='wedding')return has('weddings');return navFor().some(n=>n[0]===page);}
 
 function shell(content){
   const m=me(),nav=navFor(),items=nav.filter(n=>n[0]!=='grp');
@@ -306,11 +309,11 @@ P.c_tast=function(){
   return top('Proeverijen')+card('Planning proeverijen',`<div class="bc-list">${rows}</div>`);
 };
 P.tasks=function(){
-  const m=me(),dept=m.role==='owner'?st.dept:ROLE_INFO[m.role].dept;
+  const m=me(),dept=isFull(m.role)?st.dept:ROLE_INFO[m.role].dept;
   let ts=tasks(dept);if(st.filter==='open')ts=ts.filter(t=>t.status!=='completed');if(st.filter==='done')ts=ts.filter(t=>t.status==='completed');
   ts.sort((a,b)=>a.deadline.localeCompare(b.deadline));
   return top('Taken',`<button type="button" class="bc-btn" onclick="BC.taskModal('${dept==='Alle'?'Planning':dept}')">${ic('plus',16)}Nieuwe taak</button>`)+
-  `${m.role==='owner'?chips([['Alle','Alle afdelingen'],...DEPTS.map(d=>[d,d])],st.dept,'BC.deptFilter'):''}${seg([['open','Open'],['done','Klaar'],['all','Alles']],st.filter,'BC.taskFilter')}
+  `${isFull(m.role)?chips([['Alle','Alle afdelingen'],...DEPTS.map(d=>[d,d])],st.dept,'BC.deptFilter'):''}${seg([['open','Open'],['done','Klaar'],['all','Alles']],st.filter,'BC.taskFilter')}
 ${card(esc(dept==='Alle'?'Alle afdelingen':dept),`<div class="bc-list">${ts.map(t=>taskRow(t)).join('')||empty('Geen taken in deze lijst.')}</div>`)}`;
 };
 P.weddings=function(){
@@ -318,8 +321,8 @@ P.weddings=function(){
 };
 P.wedding=function(){
   const w=wed(st.detail);if(!w)return P.weddings();
-  const m=me(),mine=ROLE_INFO[m.role].dept,full=m.role==='owner'||m.role==='planner';
-  const tabs=[['overzicht','Overzicht'],...DEPTS.filter(d=>full||d===mine).map(d=>[d,d])];if(m.role==='owner')tabs.push(['budget','Budget']);
+  const m=me(),mine=ROLE_INFO[m.role].dept,full=isFull(m.role)||m.role==='planner';
+  const tabs=[['overzicht','Overzicht'],...DEPTS.filter(d=>full||d===mine).map(d=>[d,d])];if(isFull(m.role))tabs.push(['budget','Budget']);
   if(!tabs.some(t=>t[0]===st.tab))st.tab='overzicht';
   let body='';
   if(st.tab==='Planning')body=planningSection(w);else if(st.tab==='Styling')body=stylingSection(w);else if(st.tab==='Decoratie')body=decorSection(w);else if(st.tab==='Catering')body=cateringSection(w);else if(st.tab==='budget')body=budgetSection(w);
@@ -342,7 +345,7 @@ ${card('Facturen',`<div class="bc-list">${DB.invoices.map(invoiceRow).join('')}<
 P.team=function(){
   const roles=Object.keys(DB.access);
   return top('Team & toegang',`<button type="button" class="bc-btn" onclick="BC.memberModal()">${ic('plus',16)}Teamlid</button>`)+
-  `<div class="bc-grid wide">${CLOUD?card('Accounts',cloudTeamRows()):card('Accounts',`<div class="bc-list">${DB.accounts.map(a=>`<div class="bc-row"><span class="bc-avatar" data-no-translate>${esc(initials(a.name))}</span><div class="grow"><span class="t" data-no-translate>${esc(a.name)}</span><span class="s">${esc(ROLE_INFO[a.role]?.label||a.role)}</span></div>${a.role==='owner'?'<span class="bc-pill gold">Owner</span>':`<button type="button" class="bc-btn ghost sm" onclick="BC.pinModal('${safeId(a.id)}')">PIN</button>${sw(a.active,`BC.toggleAccount('${safeId(a.id)}')`,'Actief')}`}</div>`).join('')}</div><p class="small muted">Demo-accounts in deze browser. Echte logins vragen een beveiligde server.</p>`)}
+  `<div class="bc-grid wide">${CLOUD?card('Accounts',cloudTeamRows()):card('Accounts',`<div class="bc-list">${DB.accounts.map(a=>`<div class="bc-row"><span class="bc-avatar" data-no-translate>${esc(initials(a.name))}</span><div class="grow"><span class="t" data-no-translate>${esc(a.name)}</span><span class="s">${esc(ROLE_INFO[a.role]?.label||a.role)}</span></div>${isFull(a.role)?`<span class="bc-pill gold">${ROLE_INFO[a.role].label}</span>`:`<button type="button" class="bc-btn ghost sm" onclick="BC.pinModal('${safeId(a.id)}')">PIN</button>${sw(a.active,`BC.toggleAccount('${safeId(a.id)}')`,'Actief')}`}</div>`).join('')}</div><p class="small muted">Demo-accounts in deze browser. Echte logins vragen een beveiligde server.</p>`)}
 ${card('Wat ziet elke afdeling?',`<div class="bc-list">${roles.map(r=>`<div style="padding:12px 0;border-top:1px solid rgba(230,196,143,.12)"><p class="t" style="margin-bottom:6px">${esc(ROLE_INFO[r].label)}</p>${ACCESS_AREAS.map(([k,l])=>`<div class="bc-row" style="min-height:48px;border:0;padding:4px 0"><div class="grow"><span class="s">${esc(l)}</span></div>${sw(!!DB.access[r][k],`BC.setAccess('${r}','${k}',this.checked)`,ROLE_INFO[r].label+' '+l)}</div>`).join('')}</div>`).join('')}</div>`)}</div>`;
 };
 /* ---------- owner documents ----------
@@ -406,7 +409,7 @@ P.calendar=function(){
   const sel=(byDay[st.calDay]||[]).sort((a,b)=>order[a.k]-order[b.k]);
   const label={w:'Trouwdag',d:'Deadline',a:'Afspraak',c:'Proeverij'};
   const selHtml=sel.map(e=>e.task?taskRow(e.task):`<div class="bc-row"><span class="bc-pill ${e.k==='w'?'gold':'line'}">${label[e.k]}</span><div class="grow"><span class="t">${esc(e.full)}</span></div></div>`).join('')||empty('Nog niets gepland. Voeg hieronder een deadline toe.');
-  const depts=m.role==='owner'?DEPTS:[ROLE_INFO[m.role].dept];
+  const depts=isFull(m.role)?DEPTS:[ROLE_INFO[m.role].dept];
   const monthName=first.toLocaleDateString('nl-BE',{month:'long'});
   return top('Kalender',`<button type="button" class="bc-btn" onclick="BC.calPick('${safeId(st.calDay)}');document.getElementById('bcDeadline')?.focus()">${ic('plus',16)}Deadline</button>`)+
   `<section class="bc-card">
@@ -552,7 +555,7 @@ function cloudTeamRows(){
 async function cloudRefreshTeam(){const list=await CLOUD.listProfiles();DB.accounts=list.map(p=>({id:p.id,name:p.name||p.email,email:p.email,role:p.role,active:p.active}));render();}
 async function cloudToggle(id){const a=DB.accounts.find(x=>x.id===id);if(!a)return;try{await CLOUD.setActive(id,!a.active);log('Account '+(!a.active?'geactiveerd':'gedeactiveerd')+': '+a.name);save();await cloudRefreshTeam();}catch(e){toast(e.message);render();}}
 function cloudInviteModal(){
-  modal('Nieuw teamlid',field('Naam','<input name="name" required maxlength="80">')+field('E-mail','<input type="email" name="email" required maxlength="120">')+field('Afdeling',`<select name="role">${Object.keys(ROLE_INFO).filter(r=>r!=='owner').map(r=>`<option value="${r}">${ROLE_INFO[r].label}</option>`).join('')}</select>`)+field('Tijdelijk wachtwoord (min. 10 tekens)','<input name="password" required minlength="10" maxlength="128" autocomplete="off">')+'<p class="small muted">Geef dit wachtwoord persoonlijk door. Na de eerste login kiest het teamlid een eigen PIN, en via "Wachtwoord vergeten?" een eigen wachtwoord.</p>','BC.cInvite(event)');
+  modal('Nieuw teamlid',field('Naam','<input name="name" required maxlength="80">')+field('E-mail','<input type="email" name="email" required maxlength="120">')+field('Afdeling',`<select name="role">${Object.keys(ROLE_INFO).filter(r=>!isFull(r)).map(r=>`<option value="${r}">${ROLE_INFO[r].label}</option>`).join('')}</select>`)+field('Tijdelijk wachtwoord (min. 10 tekens)','<input name="password" required minlength="10" maxlength="128" autocomplete="off">')+'<p class="small muted">Geef dit wachtwoord persoonlijk door. Na de eerste login kiest het teamlid een eigen PIN, en via "Wachtwoord vergeten?" een eigen wachtwoord.</p>','BC.cInvite(event)');
 }
 function docFromRow(r){return {id:r.id,section:r.section,title:r.title,person:r.person||'',wedding:r.wedding||'',date:r.signed_on||'',signed:!!r.signed,fileName:r.file_name,type:r.mime,size:Number(r.size)||0,added:r.created_at,path:r.file_path};}
 async function cloudLoadDocs(){if(cs.docsLoading)return;cs.docsLoading=true;try{cs.docs=(await CLOUD.listDocs()).map(docFromRow);}catch(e){cs.docs=[];toast('Documenten laden lukt niet');}cs.docsLoading=false;render();}
@@ -585,7 +588,7 @@ const cloudActions={
   async cSwitch(){cs.busy=false;await CLOUD.signOut().catch(()=>{});cs.phase='email';cs.pin='';cs.pin1='';cs.err='';render();},
   async cResetPin(id){if(!isOwner())return;const a=DB.accounts.find(x=>x.id===id);try{await CLOUD.resetPin(id);log('PIN gereset: '+(a?a.name:''));save();toast('PIN gereset');}catch(e){toast(e.message);}},
   async cInvite(e){if(!isOwner())return;const f=formData(e),payload={name:val(f,'name'),email:val(f,'email'),role:val(f,'role'),password:String(f.get('password')||'')};
-    if(!payload.name||!payload.email||!ROLE_INFO[payload.role]||payload.role==='owner'||payload.password.length<10){toast('Controleer de invoer');return;}
+    if(!payload.name||!payload.email||!ROLE_INFO[payload.role]||isFull(payload.role)||payload.password.length<10){toast('Controleer de invoer');return;}
     try{await CLOUD.invite(payload);closeModal();log('Teamlid toegevoegd: '+payload.name);save();await cloudRefreshTeam();toast('Account aangemaakt voor '+payload.name);}catch(x){toast(x.message);}}
 };
 
@@ -610,7 +613,7 @@ window.BC={
   calMove(n){const [y,m]=(st.calMonth||todayIso().slice(0,7)).split('-').map(Number);const d=new Date(y,m-1+n,1,12);st.calMonth=d.getFullYear()+'-'+pad(d.getMonth()+1);render();},
   calToday(){st.calMonth=todayIso().slice(0,7);st.calDay=todayIso();render();},
   calPick(d){if(!isDate(d))return;st.calDay=d;st.calMonth=d.slice(0,7);render();},
-  addDeadline(e){const f=formData(e),m=me(),title=val(f,'title'),w=val(f,'wedding'),dept=val(f,'dept'),prio=val(f,'priority'),dl=val(f,'deadline');const okDept=m.role==='owner'?DEPTS.includes(dept):dept===ROLE_INFO[m.role].dept;
+  addDeadline(e){const f=formData(e),m=me(),title=val(f,'title'),w=val(f,'wedding'),dept=val(f,'dept'),prio=val(f,'priority'),dl=val(f,'deadline');const okDept=isFull(m.role)?DEPTS.includes(dept):dept===ROLE_INFO[m.role].dept;
     if(!title||!wed(w)||!okDept||!PRIO[prio]||!isDate(dl)){toast('Controleer de invoer');return;}
     DB.tasks.push({id:uid('t'),wedding:w,title,dept,assignee:assigneeFor(dept),priority:prio,status:'todo',deadline:dl,client:false});st.calDay=dl;st.calMonth=dl.slice(0,7);commit('Deadline: '+title,w);toast('In de kalender gezet');},
   go(p){st.page=p;st.sheet=false;if(p!=='wedding')st.detail=null;render();window.scrollTo(0,0);},
@@ -631,10 +634,10 @@ window.BC={
     render();},
   logout(){if(CLOUD){cloudLock();return;}try{localStorage.removeItem(SESSION_KEY);}catch(e){}st.page=null;st.sheet=false;st.login=null;render();window.scrollTo(0,0);},
   /* tasks */
-  toggleTask(id){const t=DB.tasks.find(x=>x.id===id);if(!t)return;const m=me();if(m.role!=='owner'&&t.dept!==ROLE_INFO[m.role].dept&&m.role!=='planner')return;t.status=t.status==='completed'?'todo':'completed';commit((t.status==='completed'?'Taak afgevinkt: ':'Taak heropend: ')+t.title,t.wedding);},
-  taskModal(dept){const m=me(),depts=m.role==='owner'?DEPTS:[ROLE_INFO[m.role].dept];if(!depts.includes(dept))dept=depts[0];
+  toggleTask(id){const t=DB.tasks.find(x=>x.id===id);if(!t)return;const m=me();if(!isFull(m.role)&&t.dept!==ROLE_INFO[m.role].dept&&m.role!=='planner')return;t.status=t.status==='completed'?'todo':'completed';commit((t.status==='completed'?'Taak afgevinkt: ':'Taak heropend: ')+t.title,t.wedding);},
+  taskModal(dept){const m=me(),depts=isFull(m.role)?DEPTS:[ROLE_INFO[m.role].dept];if(!depts.includes(dept))dept=depts[0];
     modal('Nieuwe taak',field('Taak','<input name="title" required maxlength="150">')+field('Wedding',`<select name="wedding">${weddingOptions(st.wid)}</select>`)+field('Afdeling',`<select name="dept">${depts.map(d=>`<option ${d===dept?'selected':''}>${d}</option>`).join('')}</select>`)+field('Prioriteit',`<select name="priority">${Object.entries(PRIO).map(([k,l])=>`<option value="${k}" ${k==='medium'?'selected':''}>${l}</option>`).join('')}</select>`)+field('Deadline','<input type="date" name="deadline" required>'),'BC.addTask(event)');},
-  addTask(e){const f=formData(e),m=me(),title=val(f,'title'),w=val(f,'wedding'),dept=val(f,'dept'),prio=val(f,'priority'),dl=val(f,'deadline');const okDept=m.role==='owner'?DEPTS.includes(dept):dept===ROLE_INFO[m.role].dept;
+  addTask(e){const f=formData(e),m=me(),title=val(f,'title'),w=val(f,'wedding'),dept=val(f,'dept'),prio=val(f,'priority'),dl=val(f,'deadline');const okDept=isFull(m.role)?DEPTS.includes(dept):dept===ROLE_INFO[m.role].dept;
     if(!title||!wed(w)||!okDept||!PRIO[prio]||!isDate(dl)){toast('Controleer de invoer');return;}
     DB.tasks.push({id:uid('t'),wedding:w,title,dept,assignee:assigneeFor(dept),priority:prio,status:'todo',deadline:dl,client:false});closeModal();commit('Nieuwe taak: '+title,w);toast('Taak toegevoegd');},
   /* planning */
@@ -685,7 +688,7 @@ window.BC={
     DB.weddings.push({id:wid,couple:c,date:d,venue:val(f,'venue')||'Nog te bepalen',guests:parseInt(val(f,'guests'),10)||0,package:['Essential','Signature','Prestige'].includes(val(f,'package'))?val(f,'package'):'Signature',status:'planning',budget:0,spent:0,planner:assigneeFor('Planning')});
     ['Kennismaking','Locatie vastgelegd','Moodboard goedgekeurd','Gastenlijst compleet','Draaiboek klaar'].forEach(label=>DB.milestones.push({id:uid('ms'),wedding:wid,label,done:false}));
     closeModal();log('Nieuwe wedding',wid);save();toast('Wedding aangemaakt');BC.openWedding(wid);},
-  toggleAccount(id){if(!isOwner())return;if(CLOUD){cloudToggle(id);return;}const a=DB.accounts.find(x=>x.id===id);if(!a||a.role==='owner')return;a.active=!a.active;commit('Account '+(a.active?'geactiveerd':'gedeactiveerd')+': '+a.name);},
+  toggleAccount(id){if(!isOwner())return;if(CLOUD){cloudToggle(id);return;}const a=DB.accounts.find(x=>x.id===id);if(!a||isFull(a.role))return;a.active=!a.active;commit('Account '+(a.active?'geactiveerd':'gedeactiveerd')+': '+a.name);},
   setAccess(r,k,on){if(!isOwner()||!DB.access[r]||!ACCESS_AREAS.some(x=>x[0]===k))return;DB.access[r][k]=on?1:0;commit('Toegang '+ROLE_INFO[r].label+': '+k+' '+(on?'aan':'uit'));},
   pinModal(id){const a=DB.accounts.find(x=>x.id===id);if(!a)return;modal('Nieuwe PIN voor '+a.name,field('PIN (4 cijfers)','<input name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required>'),`BC.setPin(event,'${safeId(id)}')`);},
   setPin(e,id){if(!isOwner())return;const f=formData(e),p=val(f,'pin'),a=DB.accounts.find(x=>x.id===id);if(!a||!/^\d{4}$/.test(p)){toast('Gebruik 4 cijfers');return;}a.pin=p;closeModal();commit('PIN gewijzigd: '+a.name);toast('PIN opgeslagen');},
