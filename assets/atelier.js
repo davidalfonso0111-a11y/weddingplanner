@@ -127,7 +127,7 @@ function taskRow(t,showWedding=true){const done=t.status==='completed';return `<
 function navFor(){
   const m=me();if(!m)return [];
   const r=m.role,N=[];
-  if(isFull(r)){N.push(['o_home','Overzicht','home'],['weddings','Weddings','heart'],['tasks','Taken','check'],['grp','Afdelingen'],['p_home','Planning','clip'],['s_home','Styling','sparkle'],['d_home','Decoratie','flower'],['c_home','Catering','dish'],['grp','Beheer'],['leads','Leads & klanten','user'],['finance','Financiën','euro'],['calendar','Kalender','cal'],['vendors','Leveranciers','truck'],['docs','Documenten','folder'],['maquette','Atelier','palette'],['team','Team & toegang','key'],['activity','Activiteit','clock']);return N;}
+  if(isFull(r)){N.push(['o_home','Overzicht','home'],['weddings','Weddings','heart'],['tasks','Taken','check'],['grp','Afdelingen'],['p_home','Planning','clip'],['s_home','Styling','sparkle'],['d_home','Decoratie','flower'],['c_home','Catering','dish'],['grp','Beheer'],['leads','Leads & klanten','user'],['finance','Financiën','euro'],['calendar','Kalender','cal'],['vendors','Leveranciers','truck'],['docs','Documenten','folder'],['team','Team & toegang','key'],['activity','Activiteit','clock']);if(r==='owner')N.splice(N.findIndex(n=>n[0]==='docs')+1,0,['maquette','Atelier','palette']);return N;}
   if(r==='planner')N.push(['p_home','Vandaag','home']);
   if(r==='stylist')N.push(['s_home','Mijn planning','cal'],['s_props','Moodboards','palette']);
   if(r==='decoration')N.push(['d_home','Opbouw','flower'],['d_inv','Inventaris','box']);
@@ -140,7 +140,7 @@ function navFor(){
   if(has('vendors'))N.push(['vendors','Leveranciers','truck']);
   return N;
 }
-function allowed(page){const m=me();if(!m)return false;if(isFull(m.role))return true;if(page==='wedding')return has('weddings');return navFor().some(n=>n[0]===page);}
+function allowed(page){const m=me();if(!m)return false;if(page==='maquette')return m.role==='owner';if(isFull(m.role))return true;if(page==='wedding')return has('weddings');return navFor().some(n=>n[0]===page);}
 
 function shell(content){
   const m=me(),nav=navFor(),items=nav.filter(n=>n[0]!=='grp');
@@ -422,8 +422,8 @@ ${card('Deadline toevoegen',`<form onsubmit="BC.addDeadline(event)"><label class
 P.vendors=function(){return top('Leveranciers',`<button type="button" class="bc-btn" onclick="BC.vendorModal()">${ic('plus',16)}Leverancier</button>`)+`<div class="bc-grid">${DB.vendors.map(v=>{const b=DB.bookings.filter(x=>x.vendor===v.id);return `<section class="bc-card"><h3>${esc(v.name)}</h3><p class="small muted">${esc(v.category)} · ${esc(v.city)}</p><div class="bc-list">${b.map(x=>`<div class="bc-row"><div class="grow"><span class="t">${esc(wName(x.wedding))}</span></div><span class="small muted">${x.booked?'Geboekt':'Open'}</span>${sw(x.booked,`BC.toggleBooking('${safeId(x.id)}')`,'Geboekt')}</div>`).join('')||empty('Nog niet gekoppeld.')}</div></section>`;}).join('')}</div>`;};
 
 /* ---------- main render ---------- */
-/* Atelier: maquette-studio (owner + admin). Loaded on demand from assets/maquette.js. */
-const MQ_VER='20261127a';
+/* Atelier: maquette-studio (owner only, not admin). Loaded on demand from assets/maquette.js. */
+const MQ_VER='20261127b';
 function loadMaquette(){
   if(window.BCMaquette)return Promise.resolve();
   if(loadMaquette.p)return loadMaquette.p;
@@ -435,7 +435,7 @@ function loadMaquette(){
 }
 P.maquette=function(){
   setTimeout(()=>{const h=document.getElementById('mqHost');if(!h||h.dataset.on)return;h.dataset.on='1';
-    loadMaquette().then(()=>window.BCMaquette.gallery(h,{cloud:CLOUD,toast,owner:isOwner})).catch(()=>{h.innerHTML=empty('Het atelier kon niet geladen worden. Probeer opnieuw.');});},0);
+    loadMaquette().then(()=>window.BCMaquette.gallery(h,{cloud:CLOUD,toast,owner:()=>me()?.role==='owner'})).catch(()=>{h.innerHTML=empty('Het atelier kon niet geladen worden. Probeer opnieuw.');});},0);
   return top('Atelier <span class="gold" style="font-style:italic">· maquettes</span>')+`<div id="mqHost">${empty('Atelier laden…')}</div>`;
 };
 
