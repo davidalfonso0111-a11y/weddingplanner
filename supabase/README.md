@@ -17,6 +17,7 @@ The atelier (`/atelier.html`) runs as a local demo until `assets/config.js` hold
 - The "Gouden glans" intro plays after every successful login and PIN unlock.
 - Owner adds team members (name, e-mail, department, temporary password) in Team & toegang; can deactivate accounts and reset PINs.
 - Shared atelier data (weddings, tasks, planning, catering, …) lives in one row `atelier_state`, readable and writable by every active team member, with a version check against overwrites.
+- Atelier (maquette-studio): table `maquettes` (pages as JSON) and private bucket `maquettes` (photos and painted layers), both owner + admin only. Run `migrations/20261127000000_maquettes.sql` once.
 - Documents (contracts, NDA's, agreements, policies) are in the private storage bucket `documents`, readable only by the owner; files open through 60-second signed links.
 
 ## Known limits
