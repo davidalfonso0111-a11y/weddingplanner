@@ -1,4 +1,4 @@
-/* Belles Creators · Atelier — maquette-studio (owner + admin).
+/* Belles Creators · Atelier — maquette-studio (owner only).
    A page-based design editor for wedding maquettes / wedding books (16:9 pages, 960×540):
    text, photos (paste, drop, crop), shapes, checklists, and raster tools on photos and
    paint layers: brush, eraser, shade, blend (smudge/blur), fill bucket, lasso cut-out.
@@ -810,7 +810,7 @@ function normalize(row){
   return {id:row.id,title:row.title||'Maquette',couple:row.couple||'',date:row.wedding_date||'',place:row.place||'',version:Number(row.version)||1,pages};
 }
 async function openEditor(id){
-  if(!host.owner()){toast('Alleen voor de owner en admin');return;}
+  if(!host.owner()){toast('Alleen voor de owner');return;}
   loadFonts();
   let row;try{row=await store().get(id);}catch(e){toast('Openen lukt niet: '+(e.message||e));return;}
   if(!row){toast('Maquette niet gevonden');return;}
@@ -834,7 +834,7 @@ function renderGallery(){
   const cards=list?list.map(m=>`<article class="mq-card"><button type="button" class="cv" data-mq="open" data-id="${esc(m.id)}" aria-label="Open ${esc(m.title)}">${m.cover?thumbHTML(normPage(m.cover),{couple:m.couple,date:m.wedding_date,place:m.place,nr:1,total:1},320):''}</button>
 <div class="meta"><h3>${esc(m.title)}</h3><span class="small muted">${esc(m.couple||'')}${m.wedding_date?' · '+esc(fdate(m.wedding_date)):''}${m.place?' · '+esc(m.place):''}</span><span class="small muted">Laatst bewerkt ${esc(new Date(m.updated_at).toLocaleString('nl-BE',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}</span></div>
 <div class="act"><button type="button" class="bc-btn sm" data-mq="open" data-id="${esc(m.id)}">Openen</button><button type="button" class="bc-btn ghost sm" data-mq="del" data-id="${esc(m.id)}">${confirmDel===m.id?'Zeker verwijderen?':'Verwijderen'}</button></div></article>`).join(''):'';
-  g.innerHTML=`<div class="mq-gal"><div class="mq-intro"><p class="muted">Jouw creatieve ruimte: ontwerp hier wedding maquettes voor je koppels, met foto’s, kleuren, tekst en afvinklijsten. Alleen zichtbaar voor de owner en admin.</p>${creating?'':'<button type="button" class="bc-btn" data-mq="new">+ Nieuwe maquette</button>'}</div>
+  g.innerHTML=`<div class="mq-gal"><div class="mq-intro"><p class="muted">Jouw creatieve ruimte: ontwerp hier wedding maquettes voor je koppels, met foto’s, kleuren, tekst en afvinklijsten. Alleen zichtbaar voor de owner.</p>${creating?'':'<button type="button" class="bc-btn" data-mq="new">+ Nieuwe maquette</button>'}</div>
 ${galleryErr?`<p class="small" style="color:#f3b2a8">Laden lukt niet: ${esc(galleryErr)}${/maquettes|relation|schema/i.test(galleryErr)?' — is het SQL-bestand voor het atelier al uitgevoerd?':''}</p>`:''}
 ${form}${list===null?'<p class="small muted">Maquettes laden…</p>':list.length?`<div class="mq-cards">${cards}</div>`:(creating?'':'<section class="bc-card"><p class="muted">Nog geen maquettes. Start met “Nieuwe maquette”; het volledige Wedding Book-sjabloon staat dan meteen klaar.</p></section>')}</div>`;
   hydrate(g);
@@ -848,7 +848,7 @@ ${form}${list===null?'<p class="small muted">Maquettes laden…</p>':list.length
     });
     g.addEventListener('submit',async ev=>{
       if(ev.target.dataset.mq!=='create')return;ev.preventDefault();
-      if(!host.owner()){toast('Alleen voor de owner en admin');return;}
+      if(!host.owner()){toast('Alleen voor de owner');return;}
       const f=new FormData(ev.target),get=k=>String(f.get(k)||'').trim().slice(0,140);
       const pages=(f.get('start')==='blank'?['cover','blank']:BOOK).map(makePage);
       const btn=ev.target.querySelector('[type=submit]');btn.disabled=true;
