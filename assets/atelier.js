@@ -66,7 +66,7 @@ const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const todayIso=()=>iso(new Date());
 const safeId=v=>String(v??'').replace(/[^A-Za-z0-9_-]/g,'');
 const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-function me(){if(CLOUD){const p=CLOUD.profile;if(!p||cs.phase!=='ready'||!CLOUD.isUnlocked())return null;return DB.accounts.find(a=>a.id===p.id)||{id:p.id,name:p.name,role:p.role,active:true,email:p.email};}let id=null;try{id=localStorage.getItem(SESSION_KEY);}catch(e){}return DB.accounts.find(a=>a.id===id&&a.active)||null;}
+function me(){if(CLOUD){const p=CLOUD.profile;if(!p||cs.phase!=='ready'||!CLOUD.isUnlocked()||!ROLE_INFO[p.role])return null;return DB.accounts.find(a=>a.id===p.id)||{id:p.id,name:p.name,role:p.role,active:true,email:p.email};}let id=null;try{id=localStorage.getItem(SESSION_KEY);}catch(e){}return DB.accounts.find(a=>a.id===id&&a.active)||null;}
 function isOwner(){const m=me();return !!m&&isFull(m.role);}
 function has(area){const m=me();if(!m)return false;if(isFull(m.role))return true;return !!(DB.access[m.role]||{})[area];}
 function wed(id){return DB.weddings.find(w=>w.id===id);}
@@ -480,6 +480,7 @@ async function cloudLoadData(){
 function cloudBusy(on){cs.busy=on;render();}
 function cloudFail(e){cs.busy=false;cs.err=(e&&e.message)||'Er ging iets mis';cs.pin='';render();}
 async function cloudEnter(withIntro){
+  if(!ROLE_INFO[CLOUD.profile?.role]){await CLOUD.signOut().catch(()=>{});cs.phase='email';throw new Error('Je account heeft een rol die deze versie van het atelier nog niet kent. Herlaad de pagina of vraag het na.');}
   await cloudLoadData();
   CLOUD.unlock();cs.phase='ready';cs.busy=false;cs.err='';cs.pin='';cs.pin1='';
   const p=CLOUD.profile;st.page=ROLE_INFO[p.role].home;st.day=todayIso();
