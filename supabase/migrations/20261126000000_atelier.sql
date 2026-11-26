@@ -172,3 +172,8 @@ drop policy if exists documents_owner_update on storage.objects;
 create policy documents_owner_update on storage.objects for update to authenticated using (bucket_id = 'documents' and public.is_owner());
 drop policy if exists documents_owner_delete on storage.objects;
 create policy documents_owner_delete on storage.objects for delete to authenticated using (bucket_id = 'documents' and public.is_owner());
+
+-- Hardening: trigger functions are not callable through the API; role helpers only for signed-in users.
+revoke execute on function public.handle_new_user(), public.protect_owner() from public, anon, authenticated;
+revoke execute on function public.my_role(), public.is_owner(), public.is_staff() from public, anon;
+grant execute on function public.my_role(), public.is_owner(), public.is_staff() to authenticated;
