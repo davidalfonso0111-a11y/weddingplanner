@@ -137,11 +137,10 @@ function shell(content){
   const navHtml=nav.map(n=>n[0]==='grp'?`<div class="grp">${esc(n[1]).toUpperCase()}</div>`:`<button type="button" class="${st.page===n[0]||(st.page==='wedding'&&n[0]==='weddings')?'on':''}" onclick="BC.go('${n[0]}')">${ic(n[2])}<span>${esc(n[1])}</span></button>`).join('');
   const tabs=items.slice(0,4);
   const tabbar=`<nav class="bc-tabbar" aria-label="Snelmenu">${tabs.map(n=>`<button type="button" class="${st.page===n[0]||(st.page==='wedding'&&n[0]==='weddings')?'on':''}" onclick="BC.go('${n[0]}')">${ic(n[2],22)}<span>${esc(n[1].split(' ')[0])}</span></button>`).join('')}<button type="button" class="${st.sheet?'on':''}" onclick="BC.sheet(true)">${ic('more',22)}<span>Meer</span></button></nav>`;
-  const sheet=st.sheet?`<div class="bc-sheet" onclick="if(event.target===this)BC.sheet(false)"><div class="in"><div class="grab"></div><div class="bc-nav">${navHtml}<div class="grp">ACCOUNT</div><button type="button" onclick="goRoute('public')">${ic('globe')}<span>Naar website</span></button><button type="button" onclick="goRoute('portal')">${ic('heart')}<span>Client portal</span></button><button type="button" onclick="BC.logout()">${ic('out')}<span>Afmelden</span></button></div></div></div>`:'';
+  const sheet=st.sheet?`<div class="bc-sheet" onclick="if(event.target===this)BC.sheet(false)"><div class="in"><div class="grab"></div><div class="bc-nav">${navHtml}<div class="grp">ACCOUNT</div><button type="button" onclick="BC.logout()">${ic('out')}<span>Afmelden</span></button></div></div></div>`:'';
   return `<div class="bc"><div class="bc-shell">
 <aside class="bc-side"><div class="bc-brand"><img src="./assets/img/monogram.png" alt="BC · Created once. Remembered forever."></div><nav class="bc-nav" aria-label="Hoofdmenu">${navHtml}</nav>
-<div class="bc-me"><div class="bc-avatar" data-no-translate>${esc(initials(m.name))}</div><div class="grow" style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-weight:500;font-size:14px" data-no-translate>${esc(m.name)}</span><span class="small muted">${esc(ROLE_INFO[m.role].label)}</span></div><button type="button" class="bc-icon sm" onclick="BC.logout()" aria-label="Afmelden" title="Afmelden">${ic('out',16)}</button></div>
-<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button type="button" class="bc-btn ghost sm" onclick="goRoute('public')">Website</button><button type="button" class="bc-btn ghost sm" onclick="goRoute('portal')">Client portal</button></div></aside>
+<div class="bc-me"><div class="bc-avatar" data-no-translate>${esc(initials(m.name))}</div><div class="grow" style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-weight:500;font-size:14px" data-no-translate>${esc(m.name)}</span><span class="small muted">${esc(ROLE_INFO[m.role].label)}</span></div><button type="button" class="bc-icon sm" onclick="BC.logout()" aria-label="Afmelden" title="Afmelden">${ic('out',16)}</button></div></aside>
 <main class="bc-main fade"><div class="bc-mtop"><img src="./assets/img/monogram-mark.png" alt="Belles Creators"><div style="display:flex;align-items:center;gap:10px"><span class="small muted">${esc(ROLE_INFO[m.role].label)}</span><button type="button" class="bc-avatar" style="border:0" onclick="BC.sheet(true)" aria-label="Menu en account">${esc(initials(m.name))}</button></div></div>${content}</main>
 </div>${tabbar}${sheet}</div>`;
 }
@@ -154,8 +153,8 @@ function loginView(){
 <img class="logo" src="./assets/img/monogram.png" alt="BC · Created once. Remembered forever.">
 <div><span class="script" style="font-size:34px">Bienvenue</span><h1 style="font-size:40px">Welkom in het atelier</h1><p class="muted" style="margin-top:6px">Kies je account om aan te melden.</p></div>
 <div class="bc-roles">${accs.map(a=>`<button type="button" onclick="BC.pickAccount('${safeId(a.id)}')"><span class="bc-avatar" data-no-translate>${esc(initials(a.name))}</span><b data-no-translate>${esc(a.name)}</b><span>${esc(ROLE_INFO[a.role]?.label||a.role)}</span></button>`).join('')}</div>
-<p class="small muted" style="max-width:420px">Demo-login: werkt alleen op dit toestel en is geen echte beveiliging. Demo-PIN's: Owner 1111 · Planner 2222 · Styliste 3333 · Decoratie 4444 · Catering 5555.</p>
-<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"><button type="button" class="bc-btn ghost sm" onclick="goRoute('public')">Naar website</button><button type="button" class="bc-btn ghost sm" onclick="resetDemo()">Demodata herstellen</button></div>
+<p class="small muted" style="max-width:420px">Alleen voor het Belles Creators-team. Demo-login: werkt alleen op dit toestel en is nog geen echte beveiliging.</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"><button type="button" class="bc-btn ghost sm" onclick="resetDemo()">Demodata herstellen</button></div>
 </div></div></div>`;
   }
   const a=DB.accounts.find(x=>x.id===st.login);
@@ -317,7 +316,7 @@ P.wedding=function(){
   if(st.tab==='Planning')body=planningSection(w);else if(st.tab==='Styling')body=stylingSection(w);else if(st.tab==='Decoratie')body=decorSection(w);else if(st.tab==='Catering')body=cateringSection(w);else if(st.tab==='budget')body=budgetSection(w);
   else body=`<div class="bc-grid">${DEPTS.map(d=>{const ts=tasks(d).filter(t=>t.wedding===w.id),o=ts.filter(t=>t.status!=='completed');return card(esc(d),`<p class="small muted">${o.length} open van ${ts.length} taken</p><div class="bc-list">${o.slice(0,3).map(t=>taskRow(t,false)).join('')||empty('Niets open.')}</div>`);}).join('')}</div>`;
   return `<div><button type="button" class="bc-btn ghost sm" onclick="BC.go('weddings')">${ic('left',16)}Alle weddings</button></div>
-<section class="bc-hero"><img class="wm" src="./assets/img/monogram-mark.png" alt="" aria-hidden="true"><span class="eyebrow">${esc(w.package)} · nog ${daysUntil(w.date)} dagen</span><h2>${esc(w.couple)}</h2><p>${esc(longDate(w.date))} · ${esc(w.venue)} · ${w.guests} gasten · planner ${esc(w.planner)}</p><div><button type="button" class="bc-btn ghost sm" onclick="portalWedding='${safeId(w.id)}';goRoute('portal')">Bekijk client portal</button></div></section>
+<section class="bc-hero"><img class="wm" src="./assets/img/monogram-mark.png" alt="" aria-hidden="true"><span class="eyebrow">${esc(w.package)} · nog ${daysUntil(w.date)} dagen</span><h2>${esc(w.couple)}</h2><p>${esc(longDate(w.date))} · ${esc(w.venue)} · ${w.guests} gasten · planner ${esc(w.planner)}</p></section>
 ${seg(tabs,st.tab,'BC.wTab')}${body}`;
 };
 P.leads=function(){
@@ -448,8 +447,13 @@ window.BC={
   addMember(e){if(!isOwner())return;const f=formData(e),n=val(f,'name'),r=val(f,'role'),p=val(f,'pin');if(!n||!DB.access[r]||!/^\d{4}$/.test(p)){toast('Controleer de invoer');return;}DB.accounts.push({id:uid('u'),name:n,role:r,pin:p,active:true});closeModal();commit('Teamlid toegevoegd: '+n);}
 };
 
-/* Plug into the existing app: the "admin" screen now renders the Atelier. */
+/* Plug into the existing app: the "admin" screen now renders the Atelier.
+   The atelier only exists on the separate staff page (atelier.html, sets window.BC_STAFF).
+   The public site and client portal can never switch to it, and the staff page never leaves it. */
 window.renderAdmin=renderAtelier;
+if(window.BC_STAFF)screen='admin';
+const baseGoRoute=window.goRoute;
+window.goRoute=function(r){if(window.BC_STAFF||r==='admin')return;baseGoRoute(r);};
 const baseRender=window.render;
 window.render=function(){document.body.classList.toggle('bc-on',screen==='admin');baseRender();};
 })();
