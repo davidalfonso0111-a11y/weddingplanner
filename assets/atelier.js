@@ -31,6 +31,10 @@ const I={
   user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
   euro:'<path d="M17 6a7 7 0 1 0 0 12M4 10h9M4 14h9"/>',
   key:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>',
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  file:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+  down:'<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   check:'<path d="M4 12l5 5L20 6"/>',
   cal:'<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>',
@@ -117,7 +121,7 @@ function taskRow(t,showWedding=true){const done=t.status==='completed';return `<
 function navFor(){
   const m=me();if(!m)return [];
   const r=m.role,N=[];
-  if(r==='owner'){N.push(['o_home','Overzicht','home'],['weddings','Weddings','heart'],['tasks','Taken','check'],['grp','Afdelingen'],['p_home','Planning','clip'],['s_home','Styling','sparkle'],['d_home','Decoratie','flower'],['c_home','Catering','dish'],['grp','Beheer'],['leads','Leads & klanten','user'],['finance','Financiën','euro'],['calendar','Kalender','cal'],['vendors','Leveranciers','truck'],['team','Team & toegang','key'],['activity','Activiteit','clock']);return N;}
+  if(r==='owner'){N.push(['o_home','Overzicht','home'],['weddings','Weddings','heart'],['tasks','Taken','check'],['grp','Afdelingen'],['p_home','Planning','clip'],['s_home','Styling','sparkle'],['d_home','Decoratie','flower'],['c_home','Catering','dish'],['grp','Beheer'],['leads','Leads & klanten','user'],['finance','Financiën','euro'],['calendar','Kalender','cal'],['vendors','Leveranciers','truck'],['docs','Documenten','folder'],['team','Team & toegang','key'],['activity','Activiteit','clock']);return N;}
   if(r==='planner')N.push(['p_home','Vandaag','home']);
   if(r==='stylist')N.push(['s_home','Mijn planning','cal'],['s_props','Moodboards','palette']);
   if(r==='decoration')N.push(['d_home','Opbouw','flower'],['d_inv','Inventaris','box']);
@@ -336,6 +340,41 @@ P.team=function(){
   `<div class="bc-grid wide">${card('Accounts',`<div class="bc-list">${DB.accounts.map(a=>`<div class="bc-row"><span class="bc-avatar" data-no-translate>${esc(initials(a.name))}</span><div class="grow"><span class="t" data-no-translate>${esc(a.name)}</span><span class="s">${esc(ROLE_INFO[a.role]?.label||a.role)}</span></div>${a.role==='owner'?'<span class="bc-pill gold">Owner</span>':`<button type="button" class="bc-btn ghost sm" onclick="BC.pinModal('${safeId(a.id)}')">PIN</button>${sw(a.active,`BC.toggleAccount('${safeId(a.id)}')`,'Actief')}`}</div>`).join('')}</div><p class="small muted">Demo-accounts in deze browser. Echte logins vragen een beveiligde server.</p>`)}
 ${card('Wat ziet elke afdeling?',`<div class="bc-list">${roles.map(r=>`<div style="padding:12px 0;border-top:1px solid rgba(230,196,143,.12)"><p class="t" style="margin-bottom:6px">${esc(ROLE_INFO[r].label)}</p>${ACCESS_AREAS.map(([k,l])=>`<div class="bc-row" style="min-height:48px;border:0;padding:4px 0"><div class="grow"><span class="s">${esc(l)}</span></div>${sw(!!DB.access[r][k],`BC.setAccess('${r}','${k}',this.checked)`,ROLE_INFO[r].label+' '+l)}</div>`).join('')}</div>`).join('')}</div>`)}</div>`;
 };
+/* ---------- owner documents ----------
+   Files are kept in this browser's IndexedDB (on this device only); metadata lives in DB.documents.
+   Not a secure or shared document store: that needs a backend. */
+const DOC_SECTIONS=[['werk','Werkcontracten'],['nda',"NDA's"],['wedding','Wedding agreements'],['policy','Policies getekend door klanten']];
+const DOC_MAX=25*1024*1024;
+function idb(){return new Promise((res,rej)=>{if(!window.indexedDB){rej(new Error('no idb'));return;}const r=indexedDB.open('bc_atelier_files',1);r.onupgradeneeded=()=>r.result.createObjectStore('files');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+function idbDo(mode,fn){return idb().then(db=>new Promise((res,rej)=>{const tx=db.transaction('files',mode),st2=tx.objectStore('files'),req=fn(st2);tx.oncomplete=()=>res(req&&req.result);tx.onerror=()=>rej(tx.error);}));}
+function fmtSize(n){return n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' kB';}
+P.docs=function(){
+  if(!Array.isArray(DB.documents))DB.documents=[];
+  if(!st.docSec)st.docSec='werk';
+  const q=(st.docQ||'').toLowerCase();
+  const list=DB.documents.filter(d=>d.section===st.docSec&&(!q||(d.title+' '+d.person+' '+d.fileName).toLowerCase().includes(q))).sort((a,b)=>(b.added||'').localeCompare(a.added||''));
+  const counts=Object.fromEntries(DOC_SECTIONS.map(([k])=>[k,DB.documents.filter(d=>d.section===k).length]));
+  const secLabel=DOC_SECTIONS.find(x=>x[0]===st.docSec)[1];
+  const rows=list.map(d=>`<div class="bc-row" style="flex-wrap:wrap">${ic('file',22)}<div class="grow" style="flex-basis:200px"><span class="t">${esc(d.title)}</span><span class="s">${esc(d.person||'—')}${d.wedding?' · '+esc(wName(d.wedding)):''} · ${esc(d.fileName)} · ${fmtSize(d.size||0)}${d.date?' · '+fdate(d.date):''}</span></div>
+<span class="small muted">${d.signed?'Getekend':'Niet getekend'}</span>${sw(d.signed,`BC.docSigned('${safeId(d.id)}')`,'Getekend')}
+<button type="button" class="bc-icon sm" onclick="BC.docOpen('${safeId(d.id)}')" aria-label="Open ${esc(d.title)}">${ic('eye',16)}</button><button type="button" class="bc-icon sm" onclick="BC.docDownload('${safeId(d.id)}')" aria-label="Download ${esc(d.title)}">${ic('down',16)}</button>
+${st.docDel===d.id?`<button type="button" class="bc-btn sm" onclick="BC.docDelete('${safeId(d.id)}')">Zeker verwijderen?</button>`:`<button type="button" class="bc-icon sm" onclick="BC.docAskDel('${safeId(d.id)}')" aria-label="Verwijder ${esc(d.title)}">${ic('x',14)}</button>`}</div>`).join('');
+  const personOpts=[...DB.accounts.map(a=>a.name),...DB.clients.map(c=>c.name)].filter((v,i,a)=>a.indexOf(v)===i).map(n=>`<option value="${esc(n)}"></option>`).join('');
+  return top('Documenten',`<button type="button" class="bc-btn" onclick="document.getElementById('bcDocFile')?.click()">${ic('plus',16)}Uploaden</button>`)+
+  `<div class="bc-grid tight">${DOC_SECTIONS.map(([k,l])=>`<button type="button" class="bc-stat" style="${k===st.docSec?'border-color:var(--bc-gold-mid);background:var(--bc-rose)':''}" onclick="BC.docSection('${k}')" aria-pressed="${k===st.docSec}"><span class="v gold">${counts[k]}</span><span class="l">${esc(l)}</span></button>`).join('')}</div>
+<div class="bc-grid wide">
+${card(esc(secLabel),`<input type="search" placeholder="Zoek op titel of naam" aria-label="Zoeken" value="${esc(st.docQ||'')}" onchange="BC.docSearch(this.value)"><div class="bc-list">${rows||empty('Nog geen documenten in deze map.')}</div>`)}
+${card('Document toevoegen',`<form onsubmit="BC.docUpload(event)">
+<label class="bc-field"><span>Bestand (pdf, foto, Word · max 25 MB)</span><input id="bcDocFile" type="file" name="file" required accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.heic,.txt"></label>
+<label class="bc-field"><span>Map</span><select name="section">${DOC_SECTIONS.map(([k,l])=>`<option value="${k}" ${k===st.docSec?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
+<label class="bc-field"><span>Titel</span><input name="title" maxlength="120" placeholder="Bv. Arbeidscontract Anja"></label>
+<div class="bc-inline"><label class="bc-field"><span>Persoon of klant</span><input name="person" maxlength="80" list="bcDocPeople"><datalist id="bcDocPeople">${personOpts}</datalist></label><label class="bc-field"><span>Datum getekend</span><input type="date" name="date"></label></div>
+<label class="bc-field"><span>Wedding (optioneel)</span><select name="wedding"><option value="">Geen</option>${weddingOptions('')}</select></label>
+<label class="bc-row" style="display:flex;border:0;min-height:44px;cursor:pointer"><span class="grow"><span class="t">Al getekend</span></span><span class="bc-switch"><input type="checkbox" name="signed"><span></span></span></label>
+<button class="bc-btn" type="submit">${ic('plus',16)}Opslaan in ${esc(secLabel)}</button>
+<p class="small muted" style="margin-top:12px">Let op: in deze demo worden bestanden alleen in deze browser op dit toestel bewaard. Ze worden niet gedeeld en er wordt geen back-up van gemaakt.</p></form>`,'','rich')}</div>`;
+};
+
 P.activity=function(){return top('Activiteit')+card('Logboek',`<div class="bc-list">${DB.log.slice(0,80).map(l=>`<div class="bc-row"><div class="grow"><span class="t">${esc(l.what)}</span><span class="s"><span data-no-translate>${esc(l.who)}</span> · ${esc(l.w)} · ${esc(new Date(l.t).toLocaleString('nl-BE',{dateStyle:'medium',timeStyle:'short'}))}</span></div></div>`).join('')||empty('Nog geen activiteit.')}</div>`);};
 function calEvents(){
   const m=me(),dept=ROLE_INFO[m.role].dept,ev=[];
@@ -407,6 +446,21 @@ function playIntro(name){
 
 /* ---------- actions (global, used by inline handlers) ---------- */
 window.BC={
+  docSection(k){if(!DOC_SECTIONS.some(x=>x[0]===k))return;st.docSec=k;st.docDel=null;render();},
+  docSearch(v){st.docQ=String(v||'').slice(0,80);render();},
+  docAskDel(id){st.docDel=id;render();},
+  docUpload(e){e.preventDefault();if(!isOwner())return;const form=e.target,f=new FormData(form),file=f.get('file'),sec=val(f,'section');
+    if(!file||!file.size||!DOC_SECTIONS.some(x=>x[0]===sec)){toast('Kies een bestand');return;}
+    if(file.size>DOC_MAX){toast('Bestand is groter dan 25 MB');return;}
+    const w=val(f,'wedding'),date=val(f,'date'),id=uid('doc');
+    const meta={id,section:sec,title:val(f,'title')||file.name.replace(/\.[^.]+$/,''),person:val(f,'person'),wedding:wed(w)?w:'',date:isDate(date)?date:'',signed:!!f.get('signed'),fileName:file.name.slice(0,140),type:file.type||'application/octet-stream',size:file.size,added:new Date().toISOString()};
+    idbDo('readwrite',s2=>s2.put(file,id)).then(()=>{DB.documents.push(meta);st.docSec=sec;commit('Document opgeslagen: '+meta.title,meta.wedding||undefined);toast('Document opgeslagen');})
+      .catch(()=>toast('Opslaan lukt niet in deze browser'));},
+  docGet(id){return idbDo('readonly',s2=>s2.get(id));},
+  docOpen(id){const d=DB.documents.find(x=>x.id===id);if(!d)return;const win=window.open('','_blank');BC.docGet(id).then(b=>{if(!b){if(win)win.close();toast('Bestand niet gevonden op dit toestel');return;}const url=URL.createObjectURL(b);if(win)win.location=url;else window.location=url;setTimeout(()=>URL.revokeObjectURL(url),60000);}).catch(()=>{if(win)win.close();toast('Openen lukt niet');});},
+  docDownload(id){const d=DB.documents.find(x=>x.id===id);if(!d)return;BC.docGet(id).then(b=>{if(!b){toast('Bestand niet gevonden op dit toestel');return;}downloadBlob(b,d.fileName);}).catch(()=>toast('Downloaden lukt niet'));},
+  docSigned(id){const d=DB.documents.find(x=>x.id===id);if(!d||!isOwner())return;d.signed=!d.signed;commit('Document '+(d.signed?'getekend':'niet getekend')+': '+d.title);},
+  docDelete(id){if(!isOwner())return;const i=DB.documents.findIndex(x=>x.id===id);if(i<0)return;const d=DB.documents.splice(i,1)[0];st.docDel=null;idbDo('readwrite',s2=>s2.delete(id)).catch(()=>{});commit('Document verwijderd: '+d.title);toast('Verwijderd');},
   calMove(n){const [y,m]=(st.calMonth||todayIso().slice(0,7)).split('-').map(Number);const d=new Date(y,m-1+n,1,12);st.calMonth=d.getFullYear()+'-'+pad(d.getMonth()+1);render();},
   calToday(){st.calMonth=todayIso().slice(0,7);st.calDay=todayIso();render();},
   calPick(d){if(!isDate(d))return;st.calDay=d;st.calMonth=d.slice(0,7);render();},

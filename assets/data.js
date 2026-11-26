@@ -121,6 +121,7 @@ const DEFAULT = {
     {wedding:'w1',style:'walking',staff:12,kids:10,tasting:'2027-03-14',tastingOk:false,diets:{vegetarisch:14,vegan:3,halal:0,glutenvrij:5,allergie:6},courses:[{id:'c4',course:'Walking dinner',dish:'8 gangen, seizoensgebonden'}]},
     {wedding:'w3',style:'buffet',staff:18,kids:20,tasting:'2027-05-02',tastingOk:false,diets:{vegetarisch:20,vegan:6,halal:200,glutenvrij:8,allergie:9},courses:[{id:'c5',course:'Buffet',dish:'Marokkaans-Belgisch feestbuffet'}]}
   ],
+  documents: [],
   log: [{t:'2026-11-25T09:12:00',who:'Anja',what:'Venue-contract ondertekend',w:'Emma & Tom'}]
 };
 function freshDemo(){ return JSON.parse(JSON.stringify(DEFAULT)); }
