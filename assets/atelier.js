@@ -127,7 +127,7 @@ function taskRow(t,showWedding=true){const done=t.status==='completed';return `<
 function navFor(){
   const m=me();if(!m)return [];
   const r=m.role,N=[];
-  if(isFull(r)){N.push(['o_home','Overzicht','home'],['weddings','Weddings','heart'],['tasks','Taken','check'],['grp','Afdelingen'],['p_home','Planning','clip'],['s_home','Styling','sparkle'],['d_home','Decoratie','flower'],['c_home','Catering','dish'],['grp','Beheer'],['leads','Leads & klanten','user'],['finance','Financiën','euro'],['calendar','Kalender','cal'],['vendors','Leveranciers','truck'],['docs','Documenten','folder'],['team','Team & toegang','key'],['activity','Activiteit','clock']);return N;}
+  if(isFull(r)){N.push(['o_home','Overzicht','home'],['weddings','Weddings','heart'],['tasks','Taken','check'],['grp','Afdelingen'],['p_home','Planning','clip'],['s_home','Styling','sparkle'],['d_home','Decoratie','flower'],['c_home','Catering','dish'],['grp','Beheer'],['leads','Leads & klanten','user'],['finance','Financiën','euro'],['calendar','Kalender','cal'],['vendors','Leveranciers','truck'],['docs','Documenten','folder'],['maquette','Atelier','palette'],['team','Team & toegang','key'],['activity','Activiteit','clock']);return N;}
   if(r==='planner')N.push(['p_home','Vandaag','home']);
   if(r==='stylist')N.push(['s_home','Mijn planning','cal'],['s_props','Moodboards','palette']);
   if(r==='decoration')N.push(['d_home','Opbouw','flower'],['d_inv','Inventaris','box']);
@@ -422,6 +422,23 @@ ${card('Deadline toevoegen',`<form onsubmit="BC.addDeadline(event)"><label class
 P.vendors=function(){return top('Leveranciers',`<button type="button" class="bc-btn" onclick="BC.vendorModal()">${ic('plus',16)}Leverancier</button>`)+`<div class="bc-grid">${DB.vendors.map(v=>{const b=DB.bookings.filter(x=>x.vendor===v.id);return `<section class="bc-card"><h3>${esc(v.name)}</h3><p class="small muted">${esc(v.category)} · ${esc(v.city)}</p><div class="bc-list">${b.map(x=>`<div class="bc-row"><div class="grow"><span class="t">${esc(wName(x.wedding))}</span></div><span class="small muted">${x.booked?'Geboekt':'Open'}</span>${sw(x.booked,`BC.toggleBooking('${safeId(x.id)}')`,'Geboekt')}</div>`).join('')||empty('Nog niet gekoppeld.')}</div></section>`;}).join('')}</div>`;};
 
 /* ---------- main render ---------- */
+/* Atelier: maquette-studio (owner + admin). Loaded on demand from assets/maquette.js. */
+const MQ_VER='20261127a';
+function loadMaquette(){
+  if(window.BCMaquette)return Promise.resolve();
+  if(loadMaquette.p)return loadMaquette.p;
+  loadMaquette.p=new Promise((res,rej)=>{
+    const l=document.createElement('link');l.rel='stylesheet';l.href='./assets/maquette.css?v='+MQ_VER;document.head.appendChild(l);
+    const s=document.createElement('script');s.src='./assets/maquette.js?v='+MQ_VER;s.onload=()=>res();s.onerror=()=>{loadMaquette.p=null;rej(new Error('load'));};document.head.appendChild(s);
+  });
+  return loadMaquette.p;
+}
+P.maquette=function(){
+  setTimeout(()=>{const h=document.getElementById('mqHost');if(!h||h.dataset.on)return;h.dataset.on='1';
+    loadMaquette().then(()=>window.BCMaquette.gallery(h,{cloud:CLOUD,toast,owner:isOwner})).catch(()=>{h.innerHTML=empty('Het atelier kon niet geladen worden. Probeer opnieuw.');});},0);
+  return top('Atelier <span class="gold" style="font-style:italic">· maquettes</span>')+`<div id="mqHost">${empty('Atelier laden…')}</div>`;
+};
+
 function renderAtelier(){
   prepare();
   const m=me();

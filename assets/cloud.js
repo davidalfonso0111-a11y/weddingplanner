@@ -95,6 +95,27 @@ const api={
   async signedUrl(path){const {data,error}=await client().storage.from('documents').createSignedUrl(path,60);if(error)throw new Error(errText(error));return data.signedUrl;},
   async download(path){const {data,error}=await client().storage.from('documents').download(path);if(error)throw new Error(errText(error));return data;},
   async updateDoc(id,patch){const {error}=await client().from('documents').update(patch).eq('id',id);if(error)throw new Error(errText(error));},
+  /* Atelier maquettes (owner + admin only, enforced by RLS) */
+  async listMaquettes(){const {data,error}=await client().from('maquettes').select('id,title,couple,wedding_date,place,updated_at,version,cover:data->pages->0').order('updated_at',{ascending:false});if(error)throw new Error(errText(error));return data||[];},
+  async getMaquette(id){const {data,error}=await client().from('maquettes').select('*').eq('id',id).maybeSingle();if(error)throw new Error(errText(error));return data;},
+  async createMaquette(row){const {data,error}=await client().from('maquettes').insert({...row,updated_by:profile?.id}).select('*').single();if(error)throw new Error(errText(error));return data;},
+  async saveMaquette(id,patch,version){
+    const {data,error}=await client().from('maquettes').update({...patch,version:version+1,updated_at:new Date().toISOString(),updated_by:profile?.id}).eq('id',id).eq('version',version).select('version');
+    if(error)throw new Error(errText(error));
+    return data&&data.length?Number(data[0].version):null;
+  },
+  async deleteMaquette(id){
+    const st=client().storage.from('maquettes');
+    const {data:files}=await st.list(id,{limit:1000});
+    if(files&&files.length){const r=await st.remove(files.map(f=>id+'/'+f.name));if(r.error)throw new Error(errText(r.error));}
+    const {error}=await client().from('maquettes').delete().eq('id',id);if(error)throw new Error(errText(error));
+  },
+  async uploadMaquetteImage(mid,blob,ext){
+    const path=mid+'/'+crypto.randomUUID()+'.'+ext;
+    const {error}=await client().storage.from('maquettes').upload(path,blob,{contentType:blob.type||'image/png',upsert:false});
+    if(error)throw new Error(errText(error));return path;
+  },
+  async downloadMaquetteImage(path){const {data,error}=await client().storage.from('maquettes').download(path);if(error)throw new Error(errText(error));return data;},
   async deleteDoc(doc){const r=await client().storage.from('documents').remove([doc.file_path]);if(r.error)throw new Error(errText(r.error));const {error}=await client().from('documents').delete().eq('id',doc.id);if(error)throw new Error(errText(error));}
 };
 window.BCCloud=api;
