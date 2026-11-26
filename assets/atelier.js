@@ -141,7 +141,7 @@ function shell(content){
   return `<div class="bc"><div class="bc-shell">
 <aside class="bc-side"><div class="bc-brand"><img src="./assets/img/monogram.png" alt="BC · Created once. Remembered forever."></div><nav class="bc-nav" aria-label="Hoofdmenu">${navHtml}</nav>
 <div class="bc-me"><div class="bc-avatar" data-no-translate>${esc(initials(m.name))}</div><div class="grow" style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-weight:500;font-size:14px" data-no-translate>${esc(m.name)}</span><span class="small muted">${esc(ROLE_INFO[m.role].label)}</span></div><button type="button" class="bc-icon sm" onclick="BC.logout()" aria-label="Afmelden" title="Afmelden">${ic('out',16)}</button></div></aside>
-<main class="bc-main fade"><div class="bc-mtop"><img src="./assets/img/monogram-mark.png" alt="Belles Creators"><div style="display:flex;align-items:center;gap:10px"><span class="small muted">${esc(ROLE_INFO[m.role].label)}</span><button type="button" class="bc-avatar" style="border:0" onclick="BC.sheet(true)" aria-label="Menu en account">${esc(initials(m.name))}</button></div></div>${content}</main>
+<main class="bc-main"><div class="bc-mtop"><img src="./assets/img/monogram-mark.png" alt="Belles Creators"><div style="display:flex;align-items:center;gap:10px"><span class="small muted">${esc(ROLE_INFO[m.role].label)}</span><button type="button" class="bc-avatar" style="border:0" onclick="BC.sheet(true)" aria-label="Menu en account">${esc(initials(m.name))}</button></div></div>${content}</main>
 </div>${tabbar}${sheet}</div>`;
 }
 
@@ -334,16 +334,42 @@ P.team=function(){
   const roles=Object.keys(DB.access);
   return top('Team & toegang',`<button type="button" class="bc-btn" onclick="BC.memberModal()">${ic('plus',16)}Teamlid</button>`)+
   `<div class="bc-grid wide">${card('Accounts',`<div class="bc-list">${DB.accounts.map(a=>`<div class="bc-row"><span class="bc-avatar" data-no-translate>${esc(initials(a.name))}</span><div class="grow"><span class="t" data-no-translate>${esc(a.name)}</span><span class="s">${esc(ROLE_INFO[a.role]?.label||a.role)}</span></div>${a.role==='owner'?'<span class="bc-pill gold">Owner</span>':`<button type="button" class="bc-btn ghost sm" onclick="BC.pinModal('${safeId(a.id)}')">PIN</button>${sw(a.active,`BC.toggleAccount('${safeId(a.id)}')`,'Actief')}`}</div>`).join('')}</div><p class="small muted">Demo-accounts in deze browser. Echte logins vragen een beveiligde server.</p>`)}
+${card('Intro bij inloggen',`<p class="small muted">Deze animatie speelt na het inloggen. Tik op een stijl om ze te bekijken en te kiezen.</p>${seg(INTROS,introChoice(),'BC.setIntro')}<div><button type="button" class="bc-btn ghost sm" onclick="BC.playIntro()">Opnieuw afspelen</button></div>`,'','rich')}
 ${card('Wat ziet elke afdeling?',`<div class="bc-list">${roles.map(r=>`<div style="padding:12px 0;border-top:1px solid rgba(230,196,143,.12)"><p class="t" style="margin-bottom:6px">${esc(ROLE_INFO[r].label)}</p>${ACCESS_AREAS.map(([k,l])=>`<div class="bc-row" style="min-height:48px;border:0;padding:4px 0"><div class="grow"><span class="s">${esc(l)}</span></div>${sw(!!DB.access[r][k],`BC.setAccess('${r}','${k}',this.checked)`,ROLE_INFO[r].label+' '+l)}</div>`).join('')}</div>`).join('')}</div>`)}</div>`;
 };
 P.activity=function(){return top('Activiteit')+card('Logboek',`<div class="bc-list">${DB.log.slice(0,80).map(l=>`<div class="bc-row"><div class="grow"><span class="t">${esc(l.what)}</span><span class="s"><span data-no-translate>${esc(l.who)}</span> · ${esc(l.w)} · ${esc(new Date(l.t).toLocaleString('nl-BE',{dateStyle:'medium',timeStyle:'short'}))}</span></div></div>`).join('')||empty('Nog geen activiteit.')}</div>`);};
+function calEvents(){
+  const m=me(),dept=ROLE_INFO[m.role].dept,ev=[];
+  DB.weddings.forEach(w=>w.date&&ev.push({d:w.date,t:w.couple,k:'w',full:'Trouwdag '+w.couple}));
+  tasks(dept||'Alle').forEach(x=>x.deadline&&ev.push({d:x.deadline,t:x.title,k:'d',task:x,done:x.status==='completed',full:x.title+' · '+x.dept}));
+  if(!dept||dept==='Styling')DB.appointments.forEach(a=>ev.push({d:a.date,t:a.time+' '+a.title,k:'a',done:a.done,full:a.time+' · '+a.title+' · '+a.place}));
+  if(!dept||dept==='Catering')DB.catering.filter(c=>c.tasting).forEach(c=>ev.push({d:c.tasting,t:'Proeverij',k:'c',done:c.tastingOk,full:'Proeverij '+wName(c.wedding)}));
+  return ev;
+}
 P.calendar=function(){
-  const m=me(),dept=ROLE_INFO[m.role].dept,t=todayIso();
-  const ev=[...DB.weddings.map(w=>({d:w.date,t:'Trouwdag '+w.couple,k:'Trouwdag'})),...tasks(dept||'Alle').filter(x=>x.status!=='completed').map(x=>({d:x.deadline,t:x.title,k:x.dept}))];
-  if(!dept||dept==='Styling')ev.push(...DB.appointments.map(a=>({d:a.date,t:a.title,k:'Afspraak'})));
-  if(!dept||dept==='Catering')ev.push(...DB.catering.filter(c=>c.tasting).map(c=>({d:c.tasting,t:'Proeverij '+wName(c.wedding),k:'Catering'})));
-  const list=ev.filter(e=>e.d&&e.d>=t).sort((a,b)=>a.d.localeCompare(b.d)).slice(0,40);
-  return top('Kalender')+card('Komende momenten',`<div class="bc-list">${list.map(e=>`<div class="bc-row"><div class="bc-date"><b>${short(e.d).d}</b><span>${esc(short(e.d).m)}</span></div><div class="grow"><span class="t">${esc(e.t)}</span><span class="s">${esc(longDate(e.d))}</span></div><span class="bc-pill ${e.k==='Trouwdag'?'gold':'line'}">${esc(e.k)}</span></div>`).join('')||empty('Niets gepland.')}</div>`);
+  const m=me(),t=todayIso();
+  if(!st.calMonth)st.calMonth=t.slice(0,7);
+  if(!st.calDay)st.calDay=t;
+  const [y,mo]=st.calMonth.split('-').map(Number),first=new Date(y,mo-1,1,12),start=new Date(first);start.setDate(1-((first.getDay()+6)%7));
+  const ev=calEvents(),byDay={};ev.forEach(e=>{(byDay[e.d]=byDay[e.d]||[]).push(e);});
+  const order={w:0,d:1,a:2,c:3};
+  const cells=[];for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);if(i>=35&&d.getMonth()!==mo-1)break;cells.push(d);}
+  const grid=cells.map(d=>{const k=iso(d),list=(byDay[k]||[]).sort((a,b)=>order[a.k]-order[b.k]),wedding=list.some(e=>e.k==='w');
+    const chips=list.slice(0,3).map(e=>`<span class="bc-ev ${e.k} ${e.done?'done':''}">${esc(e.t)}</span>`).join('')+(list.length>3?`<span class="more">+${list.length-3} meer</span>`:'');
+    const dots=`<span class="dots">${list.slice(0,4).map(e=>`<i class="bc-dot-${e.k}"></i>`).join('')}</span>`;
+    return `<button type="button" class="day ${d.getMonth()!==mo-1?'out':''} ${k===t?'today':''} ${k===st.calDay?'sel':''} ${wedding?'wedding':''}" onclick="BC.calPick('${k}')" aria-label="${esc(longDate(k))}, ${list.length} items"><span class="n">${d.getDate()}</span>${chips}${dots}</button>`;}).join('');
+  const sel=(byDay[st.calDay]||[]).sort((a,b)=>order[a.k]-order[b.k]);
+  const label={w:'Trouwdag',d:'Deadline',a:'Afspraak',c:'Proeverij'};
+  const selHtml=sel.map(e=>e.task?taskRow(e.task):`<div class="bc-row"><span class="bc-pill ${e.k==='w'?'gold':'line'}">${label[e.k]}</span><div class="grow"><span class="t">${esc(e.full)}</span></div></div>`).join('')||empty('Nog niets gepland. Voeg hieronder een deadline toe.');
+  const depts=m.role==='owner'?DEPTS:[ROLE_INFO[m.role].dept];
+  const monthName=first.toLocaleDateString('nl-BE',{month:'long'});
+  return top('Kalender',`<button type="button" class="bc-btn" onclick="BC.calPick('${safeId(st.calDay)}');document.getElementById('bcDeadline')?.focus()">${ic('plus',16)}Deadline</button>`)+
+  `<section class="bc-card">
+<div class="bc-calhead"><div class="month"><span class="script">${esc(monthName.charAt(0).toUpperCase()+monthName.slice(1))}</span><b>${y}</b></div><div style="display:flex;gap:8px;align-items:center"><button type="button" class="bc-btn ghost sm" onclick="BC.calToday()">Vandaag</button><button type="button" class="bc-icon sm" onclick="BC.calMove(-1)" aria-label="Vorige maand">${ic('left',16)}</button><button type="button" class="bc-icon sm" onclick="BC.calMove(1)" aria-label="Volgende maand">${ic('right',16)}</button></div></div>
+<div class="bc-legend"><span><i class="bc-dot-w"></i>Trouwdag</span><span><i class="bc-dot-d"></i>Deadline</span>${(!ROLE_INFO[m.role].dept||ROLE_INFO[m.role].dept==='Styling')?'<span><i class="bc-dot-a"></i>Afspraak</span>':''}${(!ROLE_INFO[m.role].dept||ROLE_INFO[m.role].dept==='Catering')?'<span><i class="bc-dot-c"></i>Proeverij</span>':''}</div>
+<div class="bc-cal">${['MA','DI','WO','DO','VR','ZA','ZO'].map(d=>`<span class="dow">${d}</span>`).join('')}${grid}</div></section>
+<div class="bc-grid wide">${card(esc(longDate(st.calDay)),`<div class="bc-list">${selHtml}</div>`,'','rich')}
+${card('Deadline toevoegen',`<form onsubmit="BC.addDeadline(event)"><label class="bc-field"><span>Wat moet er klaar zijn?</span><input id="bcDeadline" name="title" required maxlength="150" placeholder="Bv. Bloemen bevestigen"></label><div class="bc-inline"><label class="bc-field"><span>Datum</span><input type="date" name="deadline" required value="${esc(st.calDay)}"></label><label class="bc-field"><span>Prioriteit</span><select name="priority">${Object.entries(PRIO).map(([k,l])=>`<option value="${k}" ${k==='medium'?'selected':''}>${l}</option>`).join('')}</select></label></div><div class="bc-inline"><label class="bc-field"><span>Wedding</span><select name="wedding">${weddingOptions(st.wid)}</select></label><label class="bc-field"><span>Afdeling</span><select name="dept">${depts.map(d=>`<option>${d}</option>`).join('')}</select></label></div><button class="bc-btn" type="submit">${ic('plus',16)}In de kalender zetten</button></form>`)}</div>`;
 };
 P.vendors=function(){return top('Leveranciers',`<button type="button" class="bc-btn" onclick="BC.vendorModal()">${ic('plus',16)}Leverancier</button>`)+`<div class="bc-grid">${DB.vendors.map(v=>{const b=DB.bookings.filter(x=>x.vendor===v.id);return `<section class="bc-card"><h3>${esc(v.name)}</h3><p class="small muted">${esc(v.category)} · ${esc(v.city)}</p><div class="bc-list">${b.map(x=>`<div class="bc-row"><div class="grow"><span class="t">${esc(wName(x.wedding))}</span></div><span class="small muted">${x.booked?'Geboekt':'Open'}</span>${sw(x.booked,`BC.toggleBooking('${safeId(x.id)}')`,'Geboekt')}</div>`).join('')||empty('Nog niet gekoppeld.')}</div></section>`;}).join('')}</div>`;};
 
@@ -365,8 +391,38 @@ function formData(e){e.preventDefault();return new FormData(e.target);}
 const val=(f,k)=>String(f.get(k)||'').trim();
 const isDate=v=>/^\d{4}-\d{2}-\d{2}$/.test(v),isTime=v=>/^\d{2}:\d{2}$/.test(v);
 
+/* ---------- intro animations ---------- */
+const INTRO_KEY='bc_atelier_intro';
+const INTROS=[['1','Gouden glans'],['2','Velours gordijn'],['3','Gouden ring']];
+function introChoice(){let v='1';try{v=localStorage.getItem(INTRO_KEY)||'1';}catch(e){}return INTROS.some(x=>x[0]===v)?v:'1';}
+function playIntro(v,name){
+  v=INTROS.some(x=>x[0]===String(v))?String(v):'1';
+  const old=document.getElementById('bc-intro');if(old)old.remove();
+  const slogan='Created once. Remembered forever.';
+  const words=slogan.split(' ').map((w,i)=>`<span style="animation-delay:${(v==='3'?1.6:1.5)+i*.14}s">${esc(w)}&nbsp;</span>`).join('');
+  const hello=name?(v==='2'?'Welkom, '+name:'Welkom, '+name):'';
+  const sparks=v==='3'?[...Array(14)].map((_,i)=>{const a=i/14*Math.PI*2,r=140+(i%3)*40;return `<i class="spark" style="--x:${Math.round(Math.cos(a)*r)}px;--y:${Math.round(Math.sin(a)*r)}px;animation-delay:${(.9+(i%5)*.12).toFixed(2)}s"></i>`;}).join(''):'';
+  const el=document.createElement('div');el.id='bc-intro';el.className='v'+v;el.setAttribute('role','presentation');
+  el.innerHTML=(v==='2'?'<div class="curtain l"></div><div class="curtain r"></div>':'')+(v==='3'?'<div class="ring"></div><div class="ring b"></div>'+sparks:'')+
+    `<div class="logo"><img src="./assets/img/monogram-mark.png" alt="">${v==='1'?'<div class="shine"></div>':''}</div>`+
+    `<div class="slogan" data-no-translate>${v==='2'?esc(slogan):words}</div>`+(hello?`<div class="hello" data-no-translate>${esc(hello)}</div>`:'')+`<div class="skip">Tik om verder te gaan</div>`;
+  const total=v==='2'?4.2:3.9;el.style.setProperty('--out',total+'s');
+  const close=()=>{if(el.isConnected)el.remove();};
+  el.addEventListener('click',close);el.addEventListener('animationend',e=>{if(e.target===el)close();});
+  setTimeout(close,(total+1)*1000);
+  document.body.appendChild(el);
+}
+
 /* ---------- actions (global, used by inline handlers) ---------- */
 window.BC={
+  calMove(n){const [y,m]=(st.calMonth||todayIso().slice(0,7)).split('-').map(Number);const d=new Date(y,m-1+n,1,12);st.calMonth=d.getFullYear()+'-'+pad(d.getMonth()+1);render();},
+  calToday(){st.calMonth=todayIso().slice(0,7);st.calDay=todayIso();render();},
+  calPick(d){if(!isDate(d))return;st.calDay=d;st.calMonth=d.slice(0,7);render();},
+  addDeadline(e){const f=formData(e),m=me(),title=val(f,'title'),w=val(f,'wedding'),dept=val(f,'dept'),prio=val(f,'priority'),dl=val(f,'deadline');const okDept=m.role==='owner'?DEPTS.includes(dept):dept===ROLE_INFO[m.role].dept;
+    if(!title||!wed(w)||!okDept||!PRIO[prio]||!isDate(dl)){toast('Controleer de invoer');return;}
+    DB.tasks.push({id:uid('t'),wedding:w,title,dept,assignee:assigneeFor(dept),priority:prio,status:'todo',deadline:dl,client:false});st.calDay=dl;st.calMonth=dl.slice(0,7);commit('Deadline: '+title,w);toast('In de kalender gezet');},
+  setIntro(v){if(!INTROS.some(x=>x[0]===v))return;try{localStorage.setItem(INTRO_KEY,v);}catch(e){}render();playIntro(v,'Belle');},
+  playIntro(v){playIntro(v||introChoice(),firstName());},
   go(p){st.page=p;st.sheet=false;if(p!=='wedding')st.detail=null;render();window.scrollTo(0,0);},
   sheet(o){st.sheet=!!o;render();},
   openWedding(id){if(!wed(id))return;st.detail=id;st.tab='overzicht';BC.go('wedding');},
@@ -381,7 +437,7 @@ window.BC={
   /* login */
   pickAccount(id){st.login=id&&DB.accounts.some(a=>a.id===id)?id:null;st.pin='';st.pinErr=false;render();},
   key(k){if(k==='del'){st.pin=st.pin.slice(0,-1);st.pinErr=false;render();return;}if(st.pin.length>=4)return;st.pin+=k;st.pinErr=false;
-    if(st.pin.length===4){const a=DB.accounts.find(x=>x.id===st.login);if(a&&a.active&&a.pin===st.pin){try{localStorage.setItem(SESSION_KEY,a.id);}catch(e){}st.login=null;st.pin='';st.page=ROLE_INFO[a.role].home;st.day=todayIso();log('Aangemeld');save();toast('Welkom '+a.name.split(' ')[0]);}else{st.pin='';st.pinErr=true;}}
+    if(st.pin.length===4){const a=DB.accounts.find(x=>x.id===st.login);if(a&&a.active&&a.pin===st.pin){try{localStorage.setItem(SESSION_KEY,a.id);}catch(e){}st.login=null;st.pin='';st.page=ROLE_INFO[a.role].home;st.day=todayIso();log('Aangemeld');save();playIntro(introChoice(),a.role==='owner'?'Belle':a.name.split(' ')[0]);}else{st.pin='';st.pinErr=true;}}
     render();},
   logout(){try{localStorage.removeItem(SESSION_KEY);}catch(e){}st.page=null;st.sheet=false;st.login=null;render();window.scrollTo(0,0);},
   /* tasks */
@@ -451,6 +507,7 @@ window.BC={
    The atelier only exists on the separate staff page (atelier.html, sets window.BC_STAFF).
    The public site and client portal can never switch to it, and the staff page never leaves it. */
 window.renderAdmin=renderAtelier;
+try{const q=new URLSearchParams(location.search).get('intro');if(window.BC_STAFF&&q)document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>playIntro(q,''),50));}catch(e){}
 if(window.BC_STAFF)screen='admin';
 const baseGoRoute=window.goRoute;
 window.goRoute=function(r){if(window.BC_STAFF||r==='admin')return;baseGoRoute(r);};

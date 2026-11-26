@@ -220,3 +220,87 @@ body.bc-on .toast{background:var(--bc-goldgrad);color:var(--bc-ink);font-family:
 .bc-mtop{display:none;justify-content:space-between;align-items:center;gap:12px}
 .bc-mtop img{height:46px;width:auto}
 @media (prefers-reduced-motion:reduce){.bc *{transition:none!important;animation:none!important}}
+
+/* ---------- Intro animations (after login) ---------- */
+#bc-intro{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;text-align:center;overflow:hidden;cursor:pointer;
+  background:radial-gradient(700px 500px at 50% 45%,#4a1a1d 0%,#25090b 55%,#120405 100%);color:#f6e8da;font-family:var(--bc-sans);animation:bcIntroOut .7s ease forwards;animation-delay:var(--out,3.4s)}
+#bc-intro .logo{position:relative;width:min(300px,62vw);aspect-ratio:406/208}
+#bc-intro .logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+#bc-intro .shine{position:absolute;inset:0;-webkit-mask:url('./img/monogram-mark.png') center/contain no-repeat;mask:url('./img/monogram-mark.png') center/contain no-repeat;
+  background:linear-gradient(105deg,transparent 35%,rgba(255,250,235,.95) 50%,transparent 65%) -150% 0/250% 100% no-repeat}
+#bc-intro .slogan{font-size:12px;letter-spacing:.42em;text-transform:uppercase;color:#e6c48f;padding:0 16px}
+#bc-intro .hello{font-family:var(--bc-script);font-size:34px;color:#fbe9c6;line-height:1}
+#bc-intro .skip{position:absolute;bottom:26px;font-size:11px;letter-spacing:.2em;color:#b99c88;opacity:0;animation:bcFade .6s ease 1s forwards}
+@keyframes bcIntroOut{to{opacity:0;visibility:hidden}}
+@keyframes bcFade{to{opacity:1}}
+@keyframes bcRise{from{opacity:0;transform:translateY(14px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+/* 1 · Gouden glans */
+#bc-intro.v1 .logo img{opacity:0;transform:scale(.86);filter:blur(10px);animation:bcLogoIn 1.3s cubic-bezier(.2,.7,.2,1) .2s forwards}
+#bc-intro.v1 .shine{animation:bcShine 1.4s ease-in-out 1.2s forwards}
+#bc-intro.v1 .slogan span{display:inline-block;opacity:0;animation:bcRise .7s ease forwards}
+#bc-intro.v1 .hello{opacity:0;animation:bcRise .8s ease 2.2s forwards}
+@keyframes bcLogoIn{to{opacity:1;transform:none;filter:none}}
+@keyframes bcShine{to{background-position:150% 0}}
+/* 2 · Velours gordijn */
+#bc-intro.v2{background:#160706}
+#bc-intro.v2 .curtain{position:absolute;top:0;bottom:0;width:50.5%;z-index:3;background:repeating-linear-gradient(90deg,#2d0809 0 26px,#3a1013 26px 40px,#25090b 40px 60px);box-shadow:inset 0 0 80px rgba(0,0,0,.6)}
+#bc-intro.v2 .curtain.l{left:0;animation:bcCurtainL 1.5s cubic-bezier(.7,0,.2,1) .35s forwards;border-right:2px solid #b98a48}
+#bc-intro.v2 .curtain.r{right:0;animation:bcCurtainR 1.5s cubic-bezier(.7,0,.2,1) .35s forwards;border-left:2px solid #b98a48}
+#bc-intro.v2 .logo img{opacity:0;transform:scale(1.15);animation:bcLogoIn 1.4s ease .9s forwards}
+#bc-intro.v2 .slogan{font-family:var(--bc-script);font-size:32px;letter-spacing:0;text-transform:none;color:#fbe9c6;clip-path:inset(0 100% 0 0);animation:bcWrite 1.6s ease 1.7s forwards}
+#bc-intro.v2 .hello{font-family:var(--bc-sans);font-size:11px;letter-spacing:.4em;text-transform:uppercase;color:#d9bfa8;opacity:0;animation:bcRise .7s ease 2.8s forwards}
+@keyframes bcCurtainL{to{transform:translateX(-102%)}}
+@keyframes bcCurtainR{to{transform:translateX(102%)}}
+@keyframes bcWrite{to{clip-path:inset(0 0 0 0)}}
+/* 3 · Gouden ring */
+#bc-intro.v3 .ring{position:absolute;width:min(420px,86vw);aspect-ratio:1;border-radius:50%;border:1px solid rgba(230,196,143,.6);opacity:0;animation:bcRing 2.2s ease-out .1s forwards}
+#bc-intro.v3 .ring.b{animation-delay:.5s}
+#bc-intro.v3 .logo img{clip-path:circle(0% at 50% 50%);animation:bcIris 1.5s cubic-bezier(.3,.7,.2,1) .5s forwards}
+#bc-intro.v3 .slogan span{display:inline-block;opacity:0;transform:translateY(8px);animation:bcRise .5s ease forwards}
+#bc-intro.v3 .hello{opacity:0;animation:bcRise .8s ease 2.4s forwards}
+#bc-intro.v3 i.spark{position:absolute;width:5px;height:5px;border-radius:50%;background:#fbe9c6;box-shadow:0 0 10px #e6c48f;opacity:0;animation:bcSpark 2.6s ease-out forwards}
+@keyframes bcRing{0%{opacity:0;transform:scale(.4)}30%{opacity:1}100%{opacity:0;transform:scale(1.25)}}
+@keyframes bcIris{to{clip-path:circle(75% at 50% 50%)}}
+@keyframes bcSpark{0%{opacity:0;transform:translate(0,0) scale(.4)}25%{opacity:1}100%{opacity:0;transform:translate(var(--x),var(--y)) scale(1)}}
+@media (prefers-reduced-motion:reduce){#bc-intro{animation:bcIntroOut .4s ease 1.6s forwards!important}#bc-intro *{animation:none!important;opacity:1!important;clip-path:none!important;filter:none!important;transform:none!important}#bc-intro .curtain{display:none}}
+
+/* ---------- Month calendar ---------- */
+.bc-calhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px}
+.bc-calhead .month{display:flex;align-items:baseline;gap:12px}
+.bc-calhead .month .script{font-size:52px;line-height:1}
+.bc-calhead .month b{font-family:var(--bc-serif);font-size:28px;font-weight:500;color:var(--bc-muted)}
+.bc-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.bc-cal .dow{text-align:center;font-size:11px;letter-spacing:.24em;color:var(--bc-muted);padding:4px 0}
+.bc-cal .day{position:relative;min-height:112px;padding:10px 8px 8px;border:0;border-radius:20px;text-align:left;display:flex;flex-direction:column;gap:4px;
+  background:linear-gradient(170deg,rgba(58,21,23,.9),rgba(37,9,11,.9));box-shadow:inset 0 0 0 1px rgba(230,196,143,.12);color:var(--bc-text);transition:transform .15s,box-shadow .15s;overflow:hidden}
+.bc-cal .day:hover{transform:translateY(-2px);box-shadow:inset 0 0 0 1px rgba(230,196,143,.35)}
+.bc-cal .day .n{font-family:var(--bc-serif);font-size:20px;line-height:1}
+.bc-cal .day.out{opacity:.38}
+.bc-cal .day.today .n{display:inline-grid;place-items:center;width:32px;height:32px;margin:-4px 0 0 -4px;border-radius:50%;background:var(--bc-goldgrad);color:var(--bc-ink);font-weight:600}
+.bc-cal .day.sel{background:linear-gradient(170deg,#6b2b35,#3a1517);box-shadow:inset 0 0 0 1.5px #f2c6c2}
+.bc-cal .day.wedding::after{content:"";position:absolute;right:8px;top:8px;width:16px;height:14px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 22'%3E%3Cpath d='M12 21S2 14.5 2 7.5A5 5 0 0 1 12 5a5 5 0 0 1 10 2.5C22 14.5 12 21 12 21z' fill='%23e6c48f'/%3E%3C/svg%3E") center/contain no-repeat}
+.bc-ev{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:1.2;padding:4px 8px;border-radius:999px}
+.bc-ev.w{background:var(--bc-goldgrad);color:var(--bc-ink);font-weight:600}
+.bc-ev.d{background:rgba(242,198,194,.18);color:#f8d7d3}
+.bc-ev.a{background:rgba(230,196,143,.16);color:#f1d6a0}
+.bc-ev.c{background:rgba(214,170,220,.16);color:#ecd2f0}
+.bc-ev.done{opacity:.5;text-decoration:line-through}
+.bc-cal .more{font-size:10.5px;color:var(--bc-muted);padding-left:6px}
+.bc-cal .dots{display:none;gap:3px;flex-wrap:wrap}
+.bc-cal .dots i{width:6px;height:6px;border-radius:50%}
+.bc-dot-w{background:#e6c48f}.bc-dot-d{background:#f2c6c2}.bc-dot-a{background:#c9a57a}.bc-dot-c{background:#d6aadc}
+.bc-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--bc-muted)}
+.bc-legend span{display:inline-flex;align-items:center;gap:6px}
+.bc-legend i{width:9px;height:9px;border-radius:50%}
+@media (max-width:900px){
+  .bc-cal{gap:4px}
+  .bc-cal .dow{letter-spacing:.08em;font-size:10px}
+  .bc-cal .day{min-height:58px;padding:7px 5px;border-radius:14px;align-items:center}
+  .bc-cal .day .n{font-size:17px}
+  .bc-cal .day.today .n{width:26px;height:26px;margin:-3px 0 0}
+  .bc-cal .day .bc-ev,.bc-cal .day .more{display:none}
+  .bc-cal .dots{display:flex;justify-content:center}
+  .bc-cal .day.wedding::after{right:4px;top:4px;width:10px;height:9px}
+  .bc-calhead .month .script{font-size:40px}
+}
