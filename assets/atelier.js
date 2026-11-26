@@ -5,6 +5,8 @@
 'use strict';
 
 const SESSION_KEY='bc_atelier_session';
+/* Cloud mode (Supabase) when assets/config.js is filled in; otherwise the local demo. */
+const CLOUD=window.BCCloud&&window.BCCloud.enabled?window.BCCloud:null;
 const ROLE_INFO={
   owner:{label:'Owner',dept:null,home:'o_home',blurb:'Alles in één oogopslag'},
   planner:{label:'Wedding planner',dept:'Planning',home:'p_home',blurb:'Draaiboek, taken & leveranciers'},
@@ -52,6 +54,7 @@ const I={
 };
 const ic=(n,s=18)=>`<svg aria-hidden="true" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${I[n]||''}</svg>`;
 
+const cs={phase:'boot',err:'',busy:false,pin:'',pin1:'',msg:''};
 const st={page:null,detail:null,tab:'overzicht',wid:null,day:null,weekOffset:0,filter:'open',dept:'Alle',apptType:'Alle',sheet:false,login:null,pin:'',pinErr:false};
 
 /* ---------- helpers ---------- */
@@ -60,7 +63,7 @@ const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const todayIso=()=>iso(new Date());
 const safeId=v=>String(v??'').replace(/[^A-Za-z0-9_-]/g,'');
 const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-function me(){let id=null;try{id=localStorage.getItem(SESSION_KEY);}catch(e){}return DB.accounts.find(a=>a.id===id&&a.active)||null;}
+function me(){if(CLOUD){const p=CLOUD.profile;if(!p||cs.phase!=='ready'||!CLOUD.isUnlocked())return null;return DB.accounts.find(a=>a.id===p.id)||{id:p.id,name:p.name,role:p.role,active:true,email:p.email};}let id=null;try{id=localStorage.getItem(SESSION_KEY);}catch(e){}return DB.accounts.find(a=>a.id===id&&a.active)||null;}
 function isOwner(){const m=me();return !!m&&m.role==='owner';}
 function has(area){const m=me();if(!m)return false;if(m.role==='owner')return true;return !!(DB.access[m.role]||{})[area];}
 function wed(id){return DB.weddings.find(w=>w.id===id);}
@@ -151,6 +154,8 @@ function shell(content){
 
 /* ---------- login ---------- */
 function loginView(){
+  if(CLOUD)return cloudLoginView();
+  if(window.BC_SUPABASE&&window.BC_SUPABASE.url)return `<div class="bc"><div class="bc-login"><div class="box"><img class="logo" src="./assets/img/monogram.png" alt="BC · Created once. Remembered forever."><h1 style="font-size:34px">Even geen verbinding</h1><p class="muted">De beveiligde server is niet bereikbaar. Controleer je internet en probeer opnieuw.</p><button type="button" class="bc-btn" onclick="location.reload()">Opnieuw proberen</button></div></div></div>`;
   const accs=DB.accounts.filter(a=>a.active);
   if(!st.login){
     return `<div class="bc"><div class="bc-login"><div class="box">
@@ -337,7 +342,7 @@ ${card('Facturen',`<div class="bc-list">${DB.invoices.map(invoiceRow).join('')}<
 P.team=function(){
   const roles=Object.keys(DB.access);
   return top('Team & toegang',`<button type="button" class="bc-btn" onclick="BC.memberModal()">${ic('plus',16)}Teamlid</button>`)+
-  `<div class="bc-grid wide">${card('Accounts',`<div class="bc-list">${DB.accounts.map(a=>`<div class="bc-row"><span class="bc-avatar" data-no-translate>${esc(initials(a.name))}</span><div class="grow"><span class="t" data-no-translate>${esc(a.name)}</span><span class="s">${esc(ROLE_INFO[a.role]?.label||a.role)}</span></div>${a.role==='owner'?'<span class="bc-pill gold">Owner</span>':`<button type="button" class="bc-btn ghost sm" onclick="BC.pinModal('${safeId(a.id)}')">PIN</button>${sw(a.active,`BC.toggleAccount('${safeId(a.id)}')`,'Actief')}`}</div>`).join('')}</div><p class="small muted">Demo-accounts in deze browser. Echte logins vragen een beveiligde server.</p>`)}
+  `<div class="bc-grid wide">${CLOUD?card('Accounts',cloudTeamRows()):card('Accounts',`<div class="bc-list">${DB.accounts.map(a=>`<div class="bc-row"><span class="bc-avatar" data-no-translate>${esc(initials(a.name))}</span><div class="grow"><span class="t" data-no-translate>${esc(a.name)}</span><span class="s">${esc(ROLE_INFO[a.role]?.label||a.role)}</span></div>${a.role==='owner'?'<span class="bc-pill gold">Owner</span>':`<button type="button" class="bc-btn ghost sm" onclick="BC.pinModal('${safeId(a.id)}')">PIN</button>${sw(a.active,`BC.toggleAccount('${safeId(a.id)}')`,'Actief')}`}</div>`).join('')}</div><p class="small muted">Demo-accounts in deze browser. Echte logins vragen een beveiligde server.</p>`)}
 ${card('Wat ziet elke afdeling?',`<div class="bc-list">${roles.map(r=>`<div style="padding:12px 0;border-top:1px solid rgba(230,196,143,.12)"><p class="t" style="margin-bottom:6px">${esc(ROLE_INFO[r].label)}</p>${ACCESS_AREAS.map(([k,l])=>`<div class="bc-row" style="min-height:48px;border:0;padding:4px 0"><div class="grow"><span class="s">${esc(l)}</span></div>${sw(!!DB.access[r][k],`BC.setAccess('${r}','${k}',this.checked)`,ROLE_INFO[r].label+' '+l)}</div>`).join('')}</div>`).join('')}</div>`)}</div>`;
 };
 /* ---------- owner documents ----------
@@ -351,9 +356,11 @@ function fmtSize(n){return n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Mat
 P.docs=function(){
   if(!Array.isArray(DB.documents))DB.documents=[];
   if(!st.docSec)st.docSec='werk';
+  if(CLOUD&&!cs.docs){cloudLoadDocs();return top('Documenten','')+empty('Documenten laden…');}
+  const DOCS=CLOUD?cs.docs:DB.documents;
   const q=(st.docQ||'').toLowerCase();
-  const list=DB.documents.filter(d=>d.section===st.docSec&&(!q||(d.title+' '+d.person+' '+d.fileName).toLowerCase().includes(q))).sort((a,b)=>(b.added||'').localeCompare(a.added||''));
-  const counts=Object.fromEntries(DOC_SECTIONS.map(([k])=>[k,DB.documents.filter(d=>d.section===k).length]));
+  const list=DOCS.filter(d=>d.section===st.docSec&&(!q||(d.title+' '+d.person+' '+d.fileName).toLowerCase().includes(q))).sort((a,b)=>(b.added||'').localeCompare(a.added||''));
+  const counts=Object.fromEntries(DOC_SECTIONS.map(([k])=>[k,DOCS.filter(d=>d.section===k).length]));
   const secLabel=DOC_SECTIONS.find(x=>x[0]===st.docSec)[1];
   const rows=list.map(d=>`<div class="bc-row" style="flex-wrap:wrap">${ic('file',22)}<div class="grow" style="flex-basis:200px"><span class="t">${esc(d.title)}</span><span class="s">${esc(d.person||'—')}${d.wedding?' · '+esc(wName(d.wedding)):''} · ${esc(d.fileName)} · ${fmtSize(d.size||0)}${d.date?' · '+fdate(d.date):''}</span></div>
 <span class="small muted">${d.signed?'Getekend':'Niet getekend'}</span>${sw(d.signed,`BC.docSigned('${safeId(d.id)}')`,'Getekend')}
@@ -444,6 +451,144 @@ function playIntro(name){
   document.body.appendChild(el);
 }
 
+/* ---------- cloud mode (Supabase) ----------
+   Login: e-mail + wachtwoord, daarna een eigen PIN; volgende keren ontgrendelen met PIN.
+   Na elke geslaagde login of PIN-ontgrendeling speelt de Gouden glans. */
+const LOCAL_ONLY=['accounts','documents'];
+function introName(p){return String(p?.name||'').split(' ')[0]||'';}
+function stripState(){const o={};for(const k of Object.keys(DB))if(!LOCAL_ONLY.includes(k))o[k]=DB[k];return o;}
+function blankState(){const b=freshDemo();for(const k of Object.keys(b))if(Array.isArray(b[k]))b[k]=[];return b;}
+function mergeState(remote){
+  const r=blankState();
+  if(remote&&typeof remote==='object'&&!Array.isArray(remote)){
+    for(const k of Object.keys(r)){
+      if(Array.isArray(r[k])){if(Array.isArray(remote[k]))r[k]=remote[k].filter(x=>x&&typeof x==='object'&&!Array.isArray(x));}
+      else if(r[k]&&typeof r[k]==='object'&&remote[k]&&typeof remote[k]==='object'){for(const role of Object.keys(r[k]))if(remote[k][role]&&typeof remote[k][role]==='object')Object.assign(r[k][role],remote[k][role]);}
+    }
+  }
+  return r;
+}
+async function cloudLoadData(){
+  let remote=await CLOUD.loadState();
+  if(remote===null){const b=blankState();for(const k of LOCAL_ONLY)delete b[k];await CLOUD.seedState(b);remote=b;}
+  const accounts=(await CLOUD.listProfiles()).map(p=>({id:p.id,name:p.name||p.email,email:p.email,role:p.role,active:p.active}));
+  DB=mergeState(remote);DB.accounts=accounts;DB.documents=[];cs.docs=null;
+}
+function cloudBusy(on){cs.busy=on;render();}
+function cloudFail(e){cs.busy=false;cs.err=(e&&e.message)||'Er ging iets mis';cs.pin='';render();}
+async function cloudEnter(withIntro){
+  await cloudLoadData();
+  CLOUD.unlock();cs.phase='ready';cs.busy=false;cs.err='';cs.pin='';cs.pin1='';
+  const p=CLOUD.profile;st.page=ROLE_INFO[p.role].home;st.day=todayIso();
+  if(withIntro){log('Aangemeld');save();}
+  render();window.scrollTo(0,0);
+  if(withIntro)playIntro(introName(p));
+}
+async function cloudAfterPassword(){
+  if(await CLOUD.hasPin())await cloudEnter(true);
+  else{cs.phase='setpin';cs.pin='';cs.pin1='';cs.busy=false;cs.err='';render();}
+}
+function cloudLock(){CLOUD.lock();cs.phase=CLOUD.profile?'pin':'email';cs.pin='';cs.err='';st.page=null;st.sheet=false;render();window.scrollTo(0,0);}
+let pollTimer=null;
+function cloudPoll(){clearInterval(pollTimer);pollTimer=setInterval(async()=>{
+  if(cs.phase!=='ready'||document.hidden)return;
+  try{const v=await CLOUD.remoteVersion();if(v>CLOUD.version&&!document.querySelector('#modal.show')&&!(document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))){await cloudLoadData();render();}}catch(e){}
+},20000);}
+async function cloudBoot(){
+  CLOUD.on(async evt=>{
+    if(evt==='recovery'){cs.phase='newpw';cs.err='';render();}
+    else if(evt==='signedout'){cs.phase='email';st.page=null;render();}
+    else if(evt==='conflict'){try{await cloudLoadData();render();toast('Iemand anders wijzigde net iets: de nieuwste versie is geladen.');}catch(e){}}
+    else if(evt==='offline'){toast('Geen verbinding: we proberen opnieuw te bewaren.');}
+  });
+  try{
+    const p=await CLOUD.init();
+    if(cs.phase==='newpw'){render();return;}
+    if(!p)cs.phase='email';
+    else if(CLOUD.isUnlocked()){await cloudEnter(false);cloudPoll();return;}
+    else cs.phase=(await CLOUD.hasPin())?'pin':'setpin';
+  }catch(e){cs.phase='email';cs.err='Kan de server niet bereiken. Probeer later opnieuw.';}
+  render();cloudPoll();
+}
+function keypad(fn,back){
+  const keys=['1','2','3','4','5','6','7','8','9'].map(k=>`<button type="button" onclick="BC.${fn}('${k}')" ${cs.busy?'disabled':''}>${k}</button>`).join('');
+  return `<div class="bc-pad">${keys}${back||'<span></span>'}<button type="button" onclick="BC.${fn}('0')" ${cs.busy?'disabled':''}>0</button><button type="button" class="txt" onclick="BC.${fn}('del')" aria-label="Wissen">${ic('left',22)}</button></div>`;
+}
+function dotsHtml(n){return `<div class="bc-dots ${cs.err?'err':''}" aria-live="polite" aria-label="${n} van 4 cijfers">${[0,1,2,3].map(i=>`<i class="${i<n?'on':''}"></i>`).join('')}</div>`;}
+function errHtml(){return cs.err?`<p class="small" role="alert" style="color:#f1d6a0">${esc(cs.err)}</p>`:'';}
+function cloudLoginView(){
+  const wrap=inner=>`<div class="bc"><div class="bc-login"><div class="box">${inner}</div></div></div>`;
+  const p=CLOUD.profile;
+  if(cs.phase==='boot')return wrap(`<img class="logo" src="./assets/img/monogram.png" alt="BC · Created once. Remembered forever."><p class="muted">Even geduld…</p>`);
+  if(cs.phase==='email')return wrap(`<img class="logo" src="./assets/img/monogram.png" alt="BC · Created once. Remembered forever.">
+<div><span class="script" style="font-size:34px">Bienvenue</span><h1 style="font-size:40px">Welkom in het atelier</h1><p class="muted" style="margin-top:6px">Meld je aan met je e-mail en wachtwoord.</p></div>
+<form class="bc-auth" onsubmit="BC.cSignIn(event)" style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:360px;text-align:left">
+${field('E-mail','<input type="email" name="email" autocomplete="username" required maxlength="120" value="'+esc(cs.email||'')+'">')}
+${field('Wachtwoord','<input type="password" name="password" autocomplete="current-password" required maxlength="128">')}
+${errHtml()}${cs.msg?`<p class="small muted" role="status">${esc(cs.msg)}</p>`:''}
+<button class="bc-btn" type="submit" ${cs.busy?'disabled':''}>${cs.busy?'Bezig…':'Inloggen'}</button>
+<button type="button" class="bc-btn ghost sm" onclick="BC.cPhase('forgot')">Wachtwoord vergeten?</button></form>
+<p class="small muted" style="max-width:420px">Alleen voor het Belles Creators-team. Een account krijg je van de owner.</p>`);
+  if(cs.phase==='forgot')return wrap(`<img src="./assets/img/monogram-mark.png" alt="Belles Creators" style="width:150px;height:auto">
+<div><h1 style="font-size:34px">Wachtwoord vergeten</h1><p class="muted">Je krijgt een link om een nieuw wachtwoord te kiezen.</p></div>
+<form onsubmit="BC.cForgot(event)" style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:360px;text-align:left">
+${field('E-mail','<input type="email" name="email" autocomplete="username" required maxlength="120" value="'+esc(cs.email||'')+'">')}${errHtml()}
+<button class="bc-btn" type="submit" ${cs.busy?'disabled':''}>Stuur link</button><button type="button" class="bc-btn ghost sm" onclick="BC.cPhase('email')">Terug</button></form>`);
+  if(cs.phase==='newpw')return wrap(`<img src="./assets/img/monogram-mark.png" alt="Belles Creators" style="width:150px;height:auto">
+<div><h1 style="font-size:34px">Nieuw wachtwoord</h1><p class="muted">Minstens 10 tekens.</p></div>
+<form onsubmit="BC.cNewPw(event)" style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:360px;text-align:left">
+${field('Nieuw wachtwoord','<input type="password" name="pw" autocomplete="new-password" required minlength="10" maxlength="128">')}
+${field('Herhaal wachtwoord','<input type="password" name="pw2" autocomplete="new-password" required minlength="10" maxlength="128">')}${errHtml()}
+<button class="bc-btn" type="submit" ${cs.busy?'disabled':''}>Opslaan en inloggen</button></form>`);
+  const head=`<img src="./assets/img/monogram-mark.png" alt="Belles Creators" style="width:150px;height:auto"><div><span class="bc-avatar" style="margin:0 auto 10px;width:58px;height:58px;font-size:18px" data-no-translate>${esc(initials(p?.name))}</span><h1 style="font-size:34px" data-no-translate>${esc(p?.name||'')}</h1>`;
+  if(cs.phase==='setpin'){const confirm=!!cs.pin1;return wrap(`${head}<p class="muted">${confirm?'Herhaal je nieuwe PIN':'Kies een PIN van 4 cijfers. Daarmee open je het atelier de volgende keren.'}</p></div>${dotsHtml(cs.pin.length)}${errHtml()}${keypad('cSetKey',`<button type="button" class="txt" onclick="BC.cSwitch()">Afmelden</button>`)}`);}
+  return wrap(`${head}<p class="muted">${esc(ROLE_INFO[p?.role]?.label||'')} · voer je PIN in</p></div>${dotsHtml(cs.pin.length)}${errHtml()}${keypad('cKey','')}
+<button type="button" class="bc-btn ghost sm" onclick="BC.cSwitch()">Inloggen met e-mail en wachtwoord</button>`);
+}
+function cloudTeamRows(){
+  const meId=CLOUD.profile?.id;
+  return `<div class="bc-list">${DB.accounts.map(a=>`<div class="bc-row" style="flex-wrap:wrap"><span class="bc-avatar" data-no-translate>${esc(initials(a.name))}</span><div class="grow" style="flex-basis:160px"><span class="t" data-no-translate>${esc(a.name)}</span><span class="s" data-no-translate>${esc(ROLE_INFO[a.role]?.label||a.role)} · ${esc(a.email||'')}</span></div>${a.id===meId?'<span class="bc-pill gold">Jij</span>':`<button type="button" class="bc-btn ghost sm" onclick="BC.cResetPin('${safeId(a.id)}')">PIN resetten</button>${sw(a.active,`BC.toggleAccount('${safeId(a.id)}')`,'Actief')}`}</div>`).join('')}</div><p class="small muted">Echte accounts op de beveiligde server. Uitgeschakelde accounts kunnen niet meer inloggen. PIN resetten: bij de volgende keer logt die persoon in met e-mail en wachtwoord en kiest een nieuwe PIN.</p>`;
+}
+async function cloudRefreshTeam(){const list=await CLOUD.listProfiles();DB.accounts=list.map(p=>({id:p.id,name:p.name||p.email,email:p.email,role:p.role,active:p.active}));render();}
+async function cloudToggle(id){const a=DB.accounts.find(x=>x.id===id);if(!a)return;try{await CLOUD.setActive(id,!a.active);log('Account '+(!a.active?'geactiveerd':'gedeactiveerd')+': '+a.name);save();await cloudRefreshTeam();}catch(e){toast(e.message);render();}}
+function cloudInviteModal(){
+  modal('Nieuw teamlid',field('Naam','<input name="name" required maxlength="80">')+field('E-mail','<input type="email" name="email" required maxlength="120">')+field('Afdeling',`<select name="role">${Object.keys(ROLE_INFO).filter(r=>r!=='owner').map(r=>`<option value="${r}">${ROLE_INFO[r].label}</option>`).join('')}</select>`)+field('Tijdelijk wachtwoord (min. 10 tekens)','<input name="password" required minlength="10" maxlength="128" autocomplete="off">')+'<p class="small muted">Geef dit wachtwoord persoonlijk door. Na de eerste login kiest het teamlid een eigen PIN, en via "Wachtwoord vergeten?" een eigen wachtwoord.</p>','BC.cInvite(event)');
+}
+function docFromRow(r){return {id:r.id,section:r.section,title:r.title,person:r.person||'',wedding:r.wedding||'',date:r.signed_on||'',signed:!!r.signed,fileName:r.file_name,type:r.mime,size:Number(r.size)||0,added:r.created_at,path:r.file_path};}
+async function cloudLoadDocs(){if(cs.docsLoading)return;cs.docsLoading=true;try{cs.docs=(await CLOUD.listDocs()).map(docFromRow);}catch(e){cs.docs=[];toast('Documenten laden lukt niet');}cs.docsLoading=false;render();}
+async function cloudUploadDoc(file,meta){toast('Uploaden…');try{const row=await CLOUD.uploadDoc(file,meta);cs.docs=[docFromRow({...row,created_at:new Date().toISOString()}),...(cs.docs||[])];st.docSec=meta.section;log('Document opgeslagen: '+meta.title,meta.wedding||undefined);save();render();toast('Document veilig opgeslagen');}catch(e){toast('Uploaden lukt niet: '+e.message);}}
+function cdoc(id){return (cs.docs||[]).find(x=>x.id===id);}
+async function cloudOpenDoc(id){const d=cdoc(id);if(!d)return;const win=window.open('','_blank');try{const url=await CLOUD.signedUrl(d.path);if(win)win.location=url;else window.location=url;}catch(e){if(win)win.close();toast('Openen lukt niet');}}
+async function cloudDownloadDoc(id){const d=cdoc(id);if(!d)return;try{downloadBlob(await CLOUD.download(d.path),d.fileName);}catch(e){toast('Downloaden lukt niet');}}
+async function cloudSignDoc(id){const d=cdoc(id);if(!d||!isOwner())return;const v=!d.signed;try{await CLOUD.updateDoc(id,{signed:v});d.signed=v;log('Document '+(v?'getekend':'niet getekend')+': '+d.title);save();render();}catch(e){toast(e.message);}}
+async function cloudDeleteDoc(id){const d=cdoc(id);if(!d)return;st.docDel=null;try{await CLOUD.deleteDoc({id:d.id,file_path:d.path});cs.docs=cs.docs.filter(x=>x.id!==id);log('Document verwijderd: '+d.title);save();render();toast('Verwijderd');}catch(e){toast(e.message);render();}}
+const cloudActions={
+  cPhase(p){if(!['email','forgot'].includes(p))return;cs.phase=p;cs.err='';cs.msg='';render();},
+  async cSignIn(e){e.preventDefault();const f=new FormData(e.target);cs.email=val(f,'email');cs.err='';cs.msg='';cloudBusy(true);try{await CLOUD.signIn(val(f,'email'),String(f.get('password')||''));await cloudAfterPassword();}catch(x){cloudFail(x);}},
+  async cForgot(e){e.preventDefault();const f=new FormData(e.target);cs.email=val(f,'email');cloudBusy(true);try{await CLOUD.sendReset(val(f,'email'));cs.busy=false;cs.phase='email';cs.msg='Als dit e-mailadres bij ons bekend is, kreeg je een link in je mailbox.';render();}catch(x){cloudFail(x);}},
+  async cNewPw(e){e.preventDefault();const f=new FormData(e.target),a=String(f.get('pw')||''),b=String(f.get('pw2')||'');if(a.length<10){cs.err='Minstens 10 tekens';render();return;}if(a!==b){cs.err='De wachtwoorden zijn niet gelijk';render();return;}cloudBusy(true);try{await CLOUD.updatePassword(a);if(!CLOUD.profile)throw new Error('Dit account is niet (meer) actief.');try{history.replaceState(null,'',location.pathname);}catch(_){}await cloudAfterPassword();}catch(x){cloudFail(x);}},
+  async cKey(k){if(cs.busy)return;if(k==='del'){cs.pin=cs.pin.slice(0,-1);cs.err='';render();return;}if(cs.pin.length>=4)return;cs.pin+=k;cs.err='';render();
+    if(cs.pin.length<4)return;cloudBusy(true);
+    try{const r=await CLOUD.verifyPin(cs.pin);
+      if(r==='ok'){await cloudEnter(true);return;}
+      cs.busy=false;cs.pin='';
+      if(r==='wrong')cs.err='Onjuiste PIN, probeer opnieuw.';
+      else if(r==='locked'){await CLOUD.signOut();cs.phase='email';cs.err='5 keer een foute PIN: log opnieuw in met e-mail en wachtwoord.';}
+      else{cs.phase='setpin';}
+      render();
+    }catch(x){cloudFail(x);}},
+  async cSetKey(k){if(cs.busy)return;if(k==='del'){cs.pin=cs.pin.slice(0,-1);cs.err='';render();return;}if(cs.pin.length>=4)return;cs.pin+=k;cs.err='';render();
+    if(cs.pin.length<4)return;
+    if(!cs.pin1){cs.pin1=cs.pin;cs.pin='';render();return;}
+    if(cs.pin!==cs.pin1){cs.pin='';cs.pin1='';cs.err='De PIN-codes waren niet gelijk. Kies opnieuw.';render();return;}
+    cloudBusy(true);try{await CLOUD.setPin(cs.pin);await cloudEnter(true);}catch(x){cs.pin1='';cloudFail(x);}},
+  async cSwitch(){cs.busy=false;await CLOUD.signOut().catch(()=>{});cs.phase='email';cs.pin='';cs.pin1='';cs.err='';render();},
+  async cResetPin(id){if(!isOwner())return;const a=DB.accounts.find(x=>x.id===id);try{await CLOUD.resetPin(id);log('PIN gereset: '+(a?a.name:''));save();toast('PIN gereset');}catch(e){toast(e.message);}},
+  async cInvite(e){if(!isOwner())return;const f=formData(e),payload={name:val(f,'name'),email:val(f,'email'),role:val(f,'role'),password:String(f.get('password')||'')};
+    if(!payload.name||!payload.email||!ROLE_INFO[payload.role]||payload.role==='owner'||payload.password.length<10){toast('Controleer de invoer');return;}
+    try{await CLOUD.invite(payload);closeModal();log('Teamlid toegevoegd: '+payload.name);save();await cloudRefreshTeam();toast('Account aangemaakt voor '+payload.name);}catch(x){toast(x.message);}}
+};
+
 /* ---------- actions (global, used by inline handlers) ---------- */
 window.BC={
   docSection(k){if(!DOC_SECTIONS.some(x=>x[0]===k))return;st.docSec=k;st.docDel=null;render();},
@@ -453,14 +598,15 @@ window.BC={
     if(!file||!file.size||!DOC_SECTIONS.some(x=>x[0]===sec)){toast('Kies een bestand');return;}
     if(file.size>DOC_MAX){toast('Bestand is groter dan 25 MB');return;}
     const w=val(f,'wedding'),date=val(f,'date'),id=uid('doc');
+    if(CLOUD){cloudUploadDoc(file,{section:sec,title:val(f,'title')||file.name.replace(/\.[^.]+$/,''),person:val(f,'person'),wedding:wed(w)?w:'',date:isDate(date)?date:'',signed:!!f.get('signed')});return;}
     const meta={id,section:sec,title:val(f,'title')||file.name.replace(/\.[^.]+$/,''),person:val(f,'person'),wedding:wed(w)?w:'',date:isDate(date)?date:'',signed:!!f.get('signed'),fileName:file.name.slice(0,140),type:file.type||'application/octet-stream',size:file.size,added:new Date().toISOString()};
     idbDo('readwrite',s2=>s2.put(file,id)).then(()=>{DB.documents.push(meta);st.docSec=sec;commit('Document opgeslagen: '+meta.title,meta.wedding||undefined);toast('Document opgeslagen');})
       .catch(()=>toast('Opslaan lukt niet in deze browser'));},
   docGet(id){return idbDo('readonly',s2=>s2.get(id));},
-  docOpen(id){const d=DB.documents.find(x=>x.id===id);if(!d)return;const win=window.open('','_blank');BC.docGet(id).then(b=>{if(!b){if(win)win.close();toast('Bestand niet gevonden op dit toestel');return;}const url=URL.createObjectURL(b);if(win)win.location=url;else window.location=url;setTimeout(()=>URL.revokeObjectURL(url),60000);}).catch(()=>{if(win)win.close();toast('Openen lukt niet');});},
-  docDownload(id){const d=DB.documents.find(x=>x.id===id);if(!d)return;BC.docGet(id).then(b=>{if(!b){toast('Bestand niet gevonden op dit toestel');return;}downloadBlob(b,d.fileName);}).catch(()=>toast('Downloaden lukt niet'));},
-  docSigned(id){const d=DB.documents.find(x=>x.id===id);if(!d||!isOwner())return;d.signed=!d.signed;commit('Document '+(d.signed?'getekend':'niet getekend')+': '+d.title);},
-  docDelete(id){if(!isOwner())return;const i=DB.documents.findIndex(x=>x.id===id);if(i<0)return;const d=DB.documents.splice(i,1)[0];st.docDel=null;idbDo('readwrite',s2=>s2.delete(id)).catch(()=>{});commit('Document verwijderd: '+d.title);toast('Verwijderd');},
+  docOpen(id){if(CLOUD){cloudOpenDoc(id);return;}const d=DB.documents.find(x=>x.id===id);if(!d)return;const win=window.open('','_blank');BC.docGet(id).then(b=>{if(!b){if(win)win.close();toast('Bestand niet gevonden op dit toestel');return;}const url=URL.createObjectURL(b);if(win)win.location=url;else window.location=url;setTimeout(()=>URL.revokeObjectURL(url),60000);}).catch(()=>{if(win)win.close();toast('Openen lukt niet');});},
+  docDownload(id){if(CLOUD){cloudDownloadDoc(id);return;}const d=DB.documents.find(x=>x.id===id);if(!d)return;BC.docGet(id).then(b=>{if(!b){toast('Bestand niet gevonden op dit toestel');return;}downloadBlob(b,d.fileName);}).catch(()=>toast('Downloaden lukt niet'));},
+  docSigned(id){if(CLOUD){cloudSignDoc(id);return;}const d=DB.documents.find(x=>x.id===id);if(!d||!isOwner())return;d.signed=!d.signed;commit('Document '+(d.signed?'getekend':'niet getekend')+': '+d.title);},
+  docDelete(id){if(!isOwner())return;if(CLOUD){cloudDeleteDoc(id);return;}const i=DB.documents.findIndex(x=>x.id===id);if(i<0)return;const d=DB.documents.splice(i,1)[0];st.docDel=null;idbDo('readwrite',s2=>s2.delete(id)).catch(()=>{});commit('Document verwijderd: '+d.title);toast('Verwijderd');},
   calMove(n){const [y,m]=(st.calMonth||todayIso().slice(0,7)).split('-').map(Number);const d=new Date(y,m-1+n,1,12);st.calMonth=d.getFullYear()+'-'+pad(d.getMonth()+1);render();},
   calToday(){st.calMonth=todayIso().slice(0,7);st.calDay=todayIso();render();},
   calPick(d){if(!isDate(d))return;st.calDay=d;st.calMonth=d.slice(0,7);render();},
@@ -483,7 +629,7 @@ window.BC={
   key(k){if(k==='del'){st.pin=st.pin.slice(0,-1);st.pinErr=false;render();return;}if(st.pin.length>=4)return;st.pin+=k;st.pinErr=false;
     if(st.pin.length===4){const a=DB.accounts.find(x=>x.id===st.login);if(a&&a.active&&a.pin===st.pin){try{localStorage.setItem(SESSION_KEY,a.id);}catch(e){}st.login=null;st.pin='';st.page=ROLE_INFO[a.role].home;st.day=todayIso();log('Aangemeld');save();playIntro(a.role==='owner'?'Belle':a.name.split(' ')[0]);}else{st.pin='';st.pinErr=true;}}
     render();},
-  logout(){try{localStorage.removeItem(SESSION_KEY);}catch(e){}st.page=null;st.sheet=false;st.login=null;render();window.scrollTo(0,0);},
+  logout(){if(CLOUD){cloudLock();return;}try{localStorage.removeItem(SESSION_KEY);}catch(e){}st.page=null;st.sheet=false;st.login=null;render();window.scrollTo(0,0);},
   /* tasks */
   toggleTask(id){const t=DB.tasks.find(x=>x.id===id);if(!t)return;const m=me();if(m.role!=='owner'&&t.dept!==ROLE_INFO[m.role].dept&&m.role!=='planner')return;t.status=t.status==='completed'?'todo':'completed';commit((t.status==='completed'?'Taak afgevinkt: ':'Taak heropend: ')+t.title,t.wedding);},
   taskModal(dept){const m=me(),depts=m.role==='owner'?DEPTS:[ROLE_INFO[m.role].dept];if(!depts.includes(dept))dept=depts[0];
@@ -539,21 +685,24 @@ window.BC={
     DB.weddings.push({id:wid,couple:c,date:d,venue:val(f,'venue')||'Nog te bepalen',guests:parseInt(val(f,'guests'),10)||0,package:['Essential','Signature','Prestige'].includes(val(f,'package'))?val(f,'package'):'Signature',status:'planning',budget:0,spent:0,planner:assigneeFor('Planning')});
     ['Kennismaking','Locatie vastgelegd','Moodboard goedgekeurd','Gastenlijst compleet','Draaiboek klaar'].forEach(label=>DB.milestones.push({id:uid('ms'),wedding:wid,label,done:false}));
     closeModal();log('Nieuwe wedding',wid);save();toast('Wedding aangemaakt');BC.openWedding(wid);},
-  toggleAccount(id){if(!isOwner())return;const a=DB.accounts.find(x=>x.id===id);if(!a||a.role==='owner')return;a.active=!a.active;commit('Account '+(a.active?'geactiveerd':'gedeactiveerd')+': '+a.name);},
+  toggleAccount(id){if(!isOwner())return;if(CLOUD){cloudToggle(id);return;}const a=DB.accounts.find(x=>x.id===id);if(!a||a.role==='owner')return;a.active=!a.active;commit('Account '+(a.active?'geactiveerd':'gedeactiveerd')+': '+a.name);},
   setAccess(r,k,on){if(!isOwner()||!DB.access[r]||!ACCESS_AREAS.some(x=>x[0]===k))return;DB.access[r][k]=on?1:0;commit('Toegang '+ROLE_INFO[r].label+': '+k+' '+(on?'aan':'uit'));},
   pinModal(id){const a=DB.accounts.find(x=>x.id===id);if(!a)return;modal('Nieuwe PIN voor '+a.name,field('PIN (4 cijfers)','<input name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required>'),`BC.setPin(event,'${safeId(id)}')`);},
   setPin(e,id){if(!isOwner())return;const f=formData(e),p=val(f,'pin'),a=DB.accounts.find(x=>x.id===id);if(!a||!/^\d{4}$/.test(p)){toast('Gebruik 4 cijfers');return;}a.pin=p;closeModal();commit('PIN gewijzigd: '+a.name);toast('PIN opgeslagen');},
-  memberModal(){modal('Nieuw teamlid',field('Naam','<input name="name" required maxlength="60">')+field('Afdeling',`<select name="role">${Object.keys(DB.access).map(r=>`<option value="${r}">${ROLE_INFO[r].label}</option>`).join('')}</select>`)+field('PIN (4 cijfers)','<input name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required>'),'BC.addMember(event)');},
+  memberModal(){if(CLOUD){cloudInviteModal();return;}modal('Nieuw teamlid',field('Naam','<input name="name" required maxlength="60">')+field('Afdeling',`<select name="role">${Object.keys(DB.access).map(r=>`<option value="${r}">${ROLE_INFO[r].label}</option>`).join('')}</select>`)+field('PIN (4 cijfers)','<input name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required>'),'BC.addMember(event)');},
   addMember(e){if(!isOwner())return;const f=formData(e),n=val(f,'name'),r=val(f,'role'),p=val(f,'pin');if(!n||!DB.access[r]||!/^\d{4}$/.test(p)){toast('Controleer de invoer');return;}DB.accounts.push({id:uid('u'),name:n,role:r,pin:p,active:true});closeModal();commit('Teamlid toegevoegd: '+n);}
 };
 
 /* Plug into the existing app: the "admin" screen now renders the Atelier.
    The atelier only exists on the separate staff page (atelier.html, sets window.BC_STAFF).
    The public site and client portal can never switch to it, and the staff page never leaves it. */
+Object.assign(window.BC,cloudActions);
 window.renderAdmin=renderAtelier;
 if(window.BC_STAFF)screen='admin';
 const baseGoRoute=window.goRoute;
 window.goRoute=function(r){if(window.BC_STAFF||r==='admin')return;baseGoRoute(r);};
 const baseRender=window.render;
 window.render=function(){document.body.classList.toggle('bc-on',screen==='admin');baseRender();};
+/* Cloud: shared data goes to the server instead of this browser. */
+if(CLOUD){window.save=function(){if(cs.phase==='ready'&&CLOUD.profile)CLOUD.queuePush(stripState());return true;};cloudBoot();}
 })();

@@ -23,7 +23,7 @@ jobs:
         run: |
           test -s index.html
           test -s atelier.html
-          for file in assets/data.js assets/app.js assets/public.js assets/admin.js assets/portal.js assets/i18n.js assets/atelier.js; do
+          for file in assets/data.js assets/app.js assets/public.js assets/admin.js assets/portal.js assets/i18n.js assets/config.js assets/cloud.js assets/atelier.js; do
             test -s "$file"
             node --check "$file"
           done
