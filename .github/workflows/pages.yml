@@ -11,11 +11,10 @@ concurrency:
   group: pages
   cancel-in-progress: false
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      artifact: ${{ steps.artifact.outputs.name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,10 +39,25 @@ jobs:
           mkdir -p _site/assets/img
           cp assets/img/* _site/assets/img/
           touch _site/.nojekyll
+      # One artifact name per build attempt, so a re-run never finds two artifacts with the same name.
+      # "Re-run failed jobs" re-runs only deploy and reuses this build's name through the job output.
+      - name: Artifact name
+        id: artifact
+        run: echo "name=github-pages-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+          name: ${{ steps.artifact.outputs.name }}
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Publish
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: ${{ needs.build.outputs.artifact }}
