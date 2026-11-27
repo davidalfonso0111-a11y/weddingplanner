@@ -202,3 +202,43 @@ footer.pub-foot .btn{margin:0 6px 6px 0}
   .pbottom{justify-content:flex-start}
   .pbottom button{min-width:58px;padding:0 8px;font-size:11px}
 }
+
+/* Phones, round 2: fit the screen and never zoom.
+   iOS zooms into any field under 16px and stays zoomed, which makes the whole page look too big. */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body{max-width:100%;overflow-x:clip}
+img,svg,video,canvas{max-width:100%}
+@media(max-width:640px){
+  :is(input,select,textarea):not(.mq-ed *){font-size:16px!important}
+  body{font-size:15px}
+  .tag-demo{font-size:9.5px;padding:3px 10px}
+  .nav-pub{gap:8px;padding:40px 14px 10px}
+  .nav-pub .btn,.nav-pub select{min-height:36px;padding:0 12px;font-size:13px}
+  .logo img{height:32px}
+  .hero{padding:24px 16px 32px;gap:22px}
+  .hero h1{font-size:clamp(30px,8.6vw,36px);margin:8px 0 12px}
+  .hero p{font-size:15px}
+  .visual{height:240px;border-radius:160px 160px 22px 22px}
+  .visual .caption{font-size:24px;bottom:18px;left:16px;right:16px}
+  .section-title{font-size:clamp(24px,7.2vw,30px)}
+  section.block{padding:40px 16px}
+  .service-card h3{font-size:22px}
+  .pkg .price{font-size:32px}
+  .portfolio{height:190px;padding:16px}
+  .portfolio b{font-size:21px}
+  .quote{font-size:20px}
+  footer.pub-foot{padding:32px 16px;gap:20px}
+  footer.pub-foot h4{font-size:20px}
+  footer.pub-foot img{max-height:70px;width:auto}
+  .card{padding:16px;border-radius:20px}
+  .btn{min-height:40px;padding:0 16px;font-size:13.5px}
+  .p-top{padding:40px 14px 10px;gap:8px}
+  .countdown{padding:18px;border-radius:22px}
+  .countdown h2{font-size:clamp(24px,7.4vw,30px)}
+  .cd-nums div{padding:10px 6px;border-radius:14px}
+  .cd-nums b{font-size:24px}
+  .main{padding:16px 14px 112px}
+  .pbottom{padding:6px 4px;gap:2px;border-radius:22px}
+  .pbottom button{min-width:54px;min-height:44px;padding:0 6px;font-size:10.5px}
+  .lang-switch{margin:14px auto 96px;padding:4px 10px;font-size:13px}
+}
