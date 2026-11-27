@@ -127,7 +127,7 @@ function taskRow(t,showWedding=true){const done=t.status==='completed';return `<
 function navFor(){
   const m=me();if(!m)return [];
   const r=m.role,N=[];
-  if(isFull(r)){N.push(['o_home','Overzicht','home'],['weddings','Weddings','heart'],['tasks','Taken','check'],['grp','Afdelingen'],['p_home','Planning','clip'],['s_home','Styling','sparkle'],['d_home','Decoratie','flower'],['c_home','Catering','dish'],['grp','Beheer'],['leads','Leads & klanten','user'],['finance','Financiën','euro'],['calendar','Kalender','cal'],['vendors','Leveranciers','truck'],['docs','Documenten','folder'],['team','Team & toegang','key'],['activity','Activiteit','clock']);if(r==='owner')N.splice(N.findIndex(n=>n[0]==='docs')+1,0,['maquette','Atelier','palette']);return N;}
+  if(isFull(r)){N.push(['o_home','Overzicht','home'],['weddings','Weddings','heart'],['tasks','Taken','check'],['grp','Afdelingen'],['p_home','Planning','clip'],['s_home','Styling','sparkle'],['d_home','Decoratie','flower'],['c_home','Catering','dish'],['grp','Beheer'],['leads','Leads & klanten','user'],['finance','Financiën','euro'],['calendar','Kalender','cal'],['vendors','Leveranciers','truck'],['docs','Documenten','folder'],['team','Team & toegang','key'],['activity','Activiteit','clock']);if(r==='owner')N.splice(N.findIndex(n=>n[0]==='tasks')+1,0,['maquette','Atelier','palette']);return N;}
   if(r==='planner')N.push(['p_home','Vandaag','home']);
   if(r==='stylist')N.push(['s_home','Mijn planning','cal'],['s_props','Moodboards','palette']);
   if(r==='decoration')N.push(['d_home','Opbouw','flower'],['d_inv','Inventaris','box']);
@@ -423,7 +423,7 @@ P.vendors=function(){return top('Leveranciers',`<button type="button" class="bc-
 
 /* ---------- main render ---------- */
 /* Atelier: maquette-studio (owner only, not admin). Loaded on demand from assets/maquette.js. */
-const MQ_VER='20261127b';
+const MQ_VER='20261127c';
 function loadMaquette(){
   if(window.BCMaquette)return Promise.resolve();
   if(loadMaquette.p)return loadMaquette.p;
